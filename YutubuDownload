@@ -39,7 +39,7 @@ show_progress_bar() {
     fi
     
     # Show ETA if available
-    if [ $# -ge 4 ] && [ -n "$4" ] && [ "$4" != "00:00" ]; then
+    if [ $# -ge 4 ] && [ -n "$4" ] && [ "$4" != "00:00" ] && [ "$4" != "NA" ]; then
         local eta="$4"
         printf " | ETA: %s" "$eta"
     fi
@@ -54,7 +54,7 @@ show_progress_bar() {
 }
 
 # Function to parse yt-dlp progress line
-parse_ytdlp_line() {
+parse_ytdlp_progress() {
     local line="$1"
     
     # Match pattern: 66.0%|2.93MiB|497.70KiB/s|00:02
@@ -84,11 +84,6 @@ parse_ytdlp_line() {
             "MiB/s") speed_mb="$speed" ;;
             "GiB/s") speed_mb=$(echo "$speed * 1024" | bc 2>/dev/null || echo "0") ;;
         esac
-        
-        # Format ETA
-        if [[ "$eta" == "NA" ]] || [[ -z "$eta" ]]; then
-            eta="00:00"
-        fi
         
         echo "$percent|$current_mb|$total_mb|$eta|${speed_mb}MB/s"
         return 0
@@ -442,68 +437,58 @@ echo ""
 echo -e "\033[38;5;39mLocation: $SAVE_LOCATION\033[0m"
 echo ""
 
-# === SIMPLE DIRECT DOWNLOAD WITH PROGRESS ===
+# === SIMPLE DOWNLOAD WITH VISUAL PROGRESS ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
     # Create a temporary file for yt-dlp output
     TEMP_OUTPUT=$(mktemp)
     
-    # Start yt-dlp and capture ALL output
-    {
-        yt-dlp \
-            $PLAYLIST_FLAG \
-            $MP3_FLAGS \
-            -f "$FORMAT" \
-            -o "$OUTPUT_TEMPLATE" \
-            $JS_RUNTIME \
-            --cookies-from-browser chrome \
-            --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-            --ignore-errors \
-            --continue \
-            --no-overwrites \
-            --merge-output-format mp4 \
-            $ARCHIVE_FLAG \
-            --progress \
-            --console-title \
-            "$URL" 2>&1
-    } > "$TEMP_OUTPUT" &
+    # Start yt-dlp and capture output
+    yt-dlp \
+        $PLAYLIST_FLAG \
+        $MP3_FLAGS \
+        -f "$FORMAT" \
+        -o "$OUTPUT_TEMPLATE" \
+        $JS_RUNTIME \
+        --cookies-from-browser chrome \
+        --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+        --ignore-errors \
+        --continue \
+        --no-overwrites \
+        --merge-output-format mp4 \
+        $ARCHIVE_FLAG \
+        --progress \
+        --newline \
+        "$URL" > "$TEMP_OUTPUT" 2>&1 &
     
     DOWNLOAD_PID=$!
     
     # Variables for progress
     LAST_PERCENT=0
-    LAST_TOTAL_MB=0
-    LAST_CURRENT_MB=0
-    LAST_ETA="00:00"
-    LAST_SPEED="0B/s"
     LAST_UPDATE=$(date +%s)
     
     # Monitor progress
     while kill -0 $DOWNLOAD_PID 2>/dev/null 2>&1; do
-        # Get the latest progress line from the output file
-        LAST_PROGRESS_LINE=$(tail -n 20 "$TEMP_OUTPUT" | grep -E '[0-9.]+%[[:space:]]+\|[[:space:]]+[0-9.]+[KMG]iB[[:space:]]+\|[[:space:]]+[0-9.]+[KMG]iB/s[[:space:]]+\|[[:space:]]+[0-9:]+|NA' | tail -n 1)
-        
-        if [ -n "$LAST_PROGRESS_LINE" ]; then
-            # Parse the progress line
-            if parse_ytdlp_line "$LAST_PROGRESS_LINE"; then
-                IFS='|' read -r percent current_mb total_mb eta speed <<< "$(parse_ytdlp_line "$LAST_PROGRESS_LINE")"
-                
-                # Only update if values changed or 2 seconds passed
-                CURRENT_TIME=$(date +%s)
-                if [[ "$percent" != "$LAST_PERCENT" ]] || [[ $((CURRENT_TIME - LAST_UPDATE)) -ge 2 ]]; then
-                    # Clear any previous output
-                    echo -ne "\033[K"
+        # Check if we have new progress data
+        if [ -s "$TEMP_OUTPUT" ]; then
+            # Get the latest progress line
+            LAST_LINE=$(tail -n 5 "$TEMP_OUTPUT" | grep -E '[0-9.]+%[[:space:]]+\|[[:space:]]+[0-9.]+[KMG]iB[[:space:]]+\|[[:space:]]+[0-9.]+[KMG]iB/s[[:space:]]+\|[[:space:]]+[0-9:]+|NA' | tail -n 1)
+            
+            if [ -n "$LAST_LINE" ]; then
+                # Parse the progress line
+                if parse_ytdlp_progress "$LAST_LINE"; then
+                    IFS='|' read -r percent current_mb total_mb eta speed <<< "$(parse_ytdlp_progress "$LAST_LINE")"
                     
-                    # Show our custom progress bar
-                    show_progress_bar "$(printf "%.0f" "$percent")" "$current_mb" "$total_mb" "$eta" "$speed"
-                    
-                    # Update last values
-                    LAST_PERCENT="$percent"
-                    LAST_CURRENT_MB="$current_mb"
-                    LAST_TOTAL_MB="$total_mb"
-                    LAST_ETA="$eta"
-                    LAST_SPEED="$speed"
-                    LAST_UPDATE="$CURRENT_TIME"
+                    # Only update if percentage changed or 1 second passed
+                    CURRENT_TIME=$(date +%s)
+                    if [[ "$percent" != "$LAST_PERCENT" ]] || [[ $((CURRENT_TIME - LAST_UPDATE)) -ge 1 ]]; then
+                        # Show our custom progress bar
+                        show_progress_bar "$(printf "%.0f" "$percent")" "$current_mb" "$total_mb" "$eta" "$speed"
+                        
+                        # Update last values
+                        LAST_PERCENT="$percent"
+                        LAST_UPDATE="$CURRENT_TIME"
+                    fi
                 fi
             fi
         fi
@@ -514,10 +499,16 @@ for ATTEMPT in 1 2 3; do
     # Clean up
     wait $DOWNLOAD_PID
     DOWNLOAD_EXIT_CODE=$?
-    rm -f "$TEMP_OUTPUT"
     
     # Clear the progress line
     echo -ne "\033[K\n"
+    
+    # Show final output (excluding progress lines)
+    if [ -s "$TEMP_OUTPUT" ]; then
+        grep -vE '[0-9.]+%[[:space:]]+\|[[:space:]]+[0-9.]+[KMG]iB[[:space:]]+\|[[:space:]]+[0-9.]+[KMG]iB/s[[:space:]]+\|[[:space:]]+[0-9:]+|NA' "$TEMP_OUTPUT" || true
+    fi
+    
+    rm -f "$TEMP_OUTPUT"
     
     # Check if download succeeded
     if [ $DOWNLOAD_EXIT_CODE -eq 0 ]; then
