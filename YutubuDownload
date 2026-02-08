@@ -579,6 +579,7 @@ if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
 fi
 
 
+
 # === PERFECTLY ALIGNED COMPLETION BOX ===
 echo ""
 echo -e "${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${RESET}"
@@ -586,23 +587,40 @@ echo -e "${BRIGHT_GREEN}║${RESET}                                             
 echo -e "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at $(date '+%I:%M:%S %p')                                           ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 
-# Create strings with proper formatting
+# Function to count visible characters (excluding color codes)
+count_visible() {
+    echo -n "$1" | sed 's/\\033\[[0-9;]*m//g' | wc -m
+}
+
+# Files saved line
 if [[ "$USE_FOLDER" == "true" ]]; then
-    FILES_LINE="${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}$FOLDER_NAME${RESET}"
+    # Visible text: "Files saved: " (13) + folder_name
+    VISIBLE_TEXT="Files saved: $FOLDER_NAME"
+    VISIBLE_LEN=${#VISIBLE_TEXT}
+    NEEDED_SPACES=$((78 - VISIBLE_LEN))
+    SPACES=$(printf '%*s' $NEEDED_SPACES '')
+    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}$FOLDER_NAME${RESET}${SPACES}${BRIGHT_GREEN}║${RESET}"
 else
-    FILES_LINE="${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}Current directory${RESET}"
+    # Visible text: "Files saved: Current directory" = 30 characters
+    NEEDED_SPACES=$((78 - 30))
+    SPACES=$(printf '%*s' $NEEDED_SPACES '')
+    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}Current directory${RESET}${SPACES}${BRIGHT_GREEN}║${RESET}"
 fi
 
+# Mode line
 if [[ "$IS_PLAYLIST" == "true" ]]; then
-    MODE_LINE="${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_GREEN}FULL PLAYLIST${RESET}"
+    # Visible text: "• Mode: FULL PLAYLIST" = 21 characters
+    NEEDED_SPACES=$((78 - 21))
+    SPACES=$(printf '%*s' $NEEDED_SPACES '')
+    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_GREEN}FULL PLAYLIST${RESET}${SPACES}${BRIGHT_GREEN}║${RESET}"
 else
-    MODE_LINE="${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_BLUE}SINGLE VIDEO ONLY${RESET}"
+    # Visible text: "• Mode: SINGLE VIDEO ONLY" = 24 characters
+    NEEDED_SPACES=$((78 - 24))
+    SPACES=$(printf '%*s' $NEEDED_SPACES '')
+    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_BLUE}SINGLE VIDEO ONLY${RESET}${SPACES}${BRIGHT_GREEN}║${RESET}"
 fi
 
-# Print with echo -e and manual spacing
-echo -e "$FILES_LINE                                                    ${BRIGHT_GREEN}║${RESET}"
-echo -e "$MODE_LINE                                                     ${BRIGHT_GREEN}║${RESET}"
-
+# Rest of the box with fixed spacing
 echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
