@@ -261,6 +261,7 @@ if [ -n "$CURRENT_USER" ] && [ "$CURRENT_USER" != "root" ]; then
         echo "💡 IMPORTANT: Since you have Deno as user '$CURRENT_USER',"
         echo "   run YutubuDownload WITHOUT sudo:"
         echo "   cd ~/youtubedownloading && YutubuDownload"
+        echo "   cd to any directory of your choice, or use the above option"
     fi
 fi
 echo ""
