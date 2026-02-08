@@ -27,7 +27,7 @@ fi
 
 echo ""
 cat << 'EOF'
-{
+
                     ▖▖  ▗   ▌   ▄        ▜      ▌
                     ▌▌▌▌▜▘▌▌▛▌▌▌▌▌▛▌▌▌▌▛▌▐ ▛▌▀▌▛▌
                     ▐ ▙▌▐▖▙▌▙▌▙▌▙▘▙▌▚▚▘▌▌▐▖▙▌█▌▙▌
@@ -203,13 +203,13 @@ echo "║                                                                       
 echo "║   💡 Tanzania Tip: Run during off-peak hours (after 10 PM EAT)               ║"
 echo "║    for best success on unstable networks                                     ║"
 echo "║                                                                              ║"
-echo "║ 🌍 Made with ❤️ for Tanzania by Johnbosco (Dar es Salaam)                    ║"
+echo "║ 🌍 Made with ❤️ for Tanzania by Johnbosco (Dar es Salaam)                     ║"
 echo "║                                                                              ║"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
 
-printf "║ %-76s ║\n" "  YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL POWER  "
-printf "║ %-76s ║\n" "Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
+printf "║" "  YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL POWER  "
+printf "║" "Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
 echo ""
 
 echo "Version: YutubuDownload v1.0 (2026-02-08)"
