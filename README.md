@@ -154,7 +154,6 @@ sudo chmod +x /usr/local/bin/YutubuDownload
 — Johnbosco, Dar es Salaam 🇹🇿  
 
 </div>
-```
 
 
 
