@@ -5,110 +5,11 @@
 
 set -euo pipefail
 
-# === TERMINAL DIMENSION DETECTION ===
-get_terminal_width() {
-    if command -v tput &> /dev/null; then
-        tput cols 2>/dev/null || echo 80
-    else
-        echo 80
-    fi
-}
-
-TERMINAL_WIDTH=$(get_terminal_width)
-
-# Responsive width categories
-if [ "$TERMINAL_WIDTH" -ge 120 ]; then
-    WIDTH_CATEGORY="large"
-elif [ "$TERMINAL_WIDTH" -ge 80 ]; then
-    WIDTH_CATEGORY="medium"
-elif [ "$TERMINAL_WIDTH" -ge 60 ]; then
-    WIDTH_CATEGORY="small"
-else
-    WIDTH_CATEGORY="tiny"
-fi
-
-# === RESPONSIVE ASCII ART ===
-print_responsive_banner() {
-    case "$WIDTH_CATEGORY" in
-        "large")
-            {
-                echo -e "\033[38;5;51m█████ █████             █████               █████                ██████████                                       ████                         █████"
-                echo -e "\033[38;5;46m░░███ ░░███             ░░███               ░░███                ░░███░░░░███                                     ░░███                        ░░███"
-                echo -e "\033[38;5;46m ░░███ ███   █████ ████ ███████   █████ ████ ░███████  █████ ████ ░███   ░░███  ██████  █████ ███ █████ ████████   ░███   ██████   ██████    ███████"
-                echo -e "\033[38;5;39m  ░░█████   ░░███ ░███ ░░░███░   ░░███ ░███  ░███░░███░░███ ░███  ░███    ░███ ███░░███░░███ ░███░░███ ░░███░░███  ░███  ███░░███ ░░░░░███  ███░░███"
-                echo -e "\033[38;5;39m   ░░███     ░███ ░███   ░███     ░███ ░███  ░███ ░███ ░███ ░███  ░███    ░███░███ ░███ ░███ ░███ ░███  ░███ ░███  ░███ ░███ ░███  ███████ ░███ ░███"
-                echo -e "\033[38;5;15m    ░███     ░███ ░███   ░███ ███ ░███ ░███  ░███ ░███ ░███ ░███  ░███    ███ ░███ ░███ ░░███████████   ░███ ░███  ░███ ░███ ░███ ███░░███ ░███ ░███"
-                echo -e "\033[38;5;15m    █████    ░░████████  ░░█████  ░░████████ ████████  ░░████████ ██████████  ░░██████   ░░████░████    ████ █████ █████░░██████ ░░████████░░████████"
-                echo -e "\033[38;5;240m   ░░░░░      ░░░░░░░░    ░░░░░    ░░░░░░░░ ░░░░░░░░    ░░░░░░░░ ░░░░░░░░░░    ░░░░░░     ░░░░ ░░░░    ░░░░ ░░░░░ ░░░░░  ░░░░░░   ░░░░░░░░  ░░░░░░░░"
-                echo -e "\033[0m"
-            } >/dev/tty 2>/dev/null || true
-            ;;
-        "medium")
-            {
-                echo -e "\033[38;5;51m╔══════════════════════════════════════════════════════╗"
-                echo -e "\033[38;5;46m║   Y U T U B U   D O W N L O A D   (v1.0)            ║"
-                echo -e "\033[38;5;39m║   Tanzania-Optimized YouTube Downloader            ║"
-                echo -e "\033[38;5;15m║   Author: Johnbosco | Dar es Salaam                ║"
-                echo -e "\033[38;5;240m╚══════════════════════════════════════════════════════╝"
-                echo -e "\033[0m"
-            } >/dev/tty 2>/dev/null || true
-            ;;
-        "small")
-            {
-                echo -e "\033[38;5;51m╔════════════════════════════════╗"
-                echo -e "\033[38;5;46m║    YUTUBU DOWNLOAD v1.0        ║"
-                echo -e "\033[38;5;39m║    Tanzania-Optimized          ║"
-                echo -e "\033[38;5;240m╚════════════════════════════════╝"
-                echo -e "\033[0m"
-            } >/dev/tty 2>/dev/null || true
-            ;;
-        "tiny")
-            echo -e "\033[38;5;46mYTDL v1.0 (TZ)\033[0m"
-            ;;
-    esac
-}
-
-print_responsive_separator() {
-    local width=$1
-    local char="${2:-═}"
-    local padding=$(( (width - 4) > 0 ? width - 4 : 60 ))
-    echo "╔$(printf "%${padding}s" | tr ' ' "$char")╗"
-}
-
-print_responsive_box_line() {
-    local width=$1
-    local text="$2"
-    local align="${3:-left}"
-    local padding=$(( (width - 4) > 0 ? width - 4 : 60 ))
-    
-    case "$align" in
-        "left")
-            printf "║ %-${padding}s ║\n" "$text"
-            ;;
-        "center")
-            local text_len=${#text}
-            local left_pad=$(( (padding - text_len) / 2 ))
-            local right_pad=$(( padding - text_len - left_pad ))
-            printf "║%${left_pad}s%s%${right_pad}s║\n" " " "$text" " "
-            ;;
-        "right")
-            printf "║ %${padding}s ║\n" "$text"
-            ;;
-    esac
-}
-
-print_responsive_box_bottom() {
-    local width=$1
-    local char="${2:-═}"
-    local padding=$(( (width - 4) > 0 ? width - 4 : 60 ))
-    echo "╚$(printf "%${padding}s" | tr ' ' "$char")╝"
-}
-
 # === ANIMATED FEEDBACK FUNCTIONS ===
 print_loading() {
     local msg="$1"
     echo -ne "\033[38;5;46m$msg\033[0m"
-    for _ in {1..3}; do
+    for _ in {1..5}; do
         echo -ne "."
         sleep 0.3
     done
@@ -117,12 +18,8 @@ print_loading() {
 
 print_error() {
     local msg="$1"
-    local width=$TERMINAL_WIDTH
-    if [ ${#msg} -gt $((width - 10)) ]; then
-        msg="${msg:0:$((width - 13))}..."
-    fi
     echo -ne "\033[38;5;196m$msg\033[0m"
-    for _ in {1..2}; do
+    for _ in {1..3}; do
         echo -ne " ❗"
         sleep 0.2
     done
@@ -135,23 +32,41 @@ if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
     exit 0
 fi
 
-# Clear screen and show banner
-clear
-print_responsive_banner
+# === BADASS HACKER-STYLE GRADIENT BANNER ===
+{
+echo -e "\033[38;5;51m█████ █████             █████               █████                ██████████                                       ████                         █████"
+echo -e "\033[38;5;46m░░███ ░░███             ░░███               ░░███                ░░███░░░░███                                     ░░███                        ░░███"
+echo -e "\033[38;5;46m ░░███ ███   █████ ████ ███████   █████ ████ ░███████  █████ ████ ░███   ░░███  ██████  █████ ███ █████ ████████   ░███   ██████   ██████    ███████"
+echo -e "\033[38;5;39m  ░░█████   ░░███ ░███ ░░░███░   ░░███ ░███  ░███░░███░░███ ░███  ░███    ░███ ███░░███░░███ ░███░░███ ░░███░░███  ░███  ███░░███ ░░░░░███  ███░░███"
+echo -e "\033[38;5;39m   ░░███     ░███ ░███   ░███     ░███ ░███  ░███ ░███ ░███ ░███  ░███    ░███░███ ░███ ░███ ░███ ░███  ░███ ░███  ░███ ░███ ░███  ███████ ░███ ░███"
+echo -e "\033[38;5;15m    ░███     ░███ ░███   ░███ ███ ░███ ░███  ░███ ░███ ░███ ░███  ░███    ███ ░███ ░███ ░░███████████   ░███ ░███  ░███ ░███ ░███ ███░░███ ░███ ░███"
+echo -e "\033[38;5;15m    █████    ░░████████  ░░█████  ░░████████ ████████  ░░████████ ██████████  ░░██████   ░░████░████    ████ █████ █████░░██████ ░░████████░░████████"
+echo -e "\033[38;5;240m   ░░░░░      ░░░░░░░░    ░░░░░    ░░░░░░░░ ░░░░░░░░    ░░░░░░░░ ░░░░░░░░░░    ░░░░░░     ░░░░ ░░░░    ░░░░ ░░░░░ ░░░░░  ░░░░░░   ░░░░░░░░  ░░░░░░░░"
+echo -e "\033[0m"
+} >/dev/tty 2>/dev/null || {
+  echo "Y U T U B U D O W N L O A D   (v1.0)"
+  echo ""
+}
+
+# === CUSTOM SWAHILI-TECH HEADER (COLORED BLOCK ART) ===
+{
+    echo "YutubeDownload, v1.0"
+} >/dev/tty 2>/dev/null || echo ""
 
 # === SMART COOKIE REFRESH (ANIMATED) ===
-print_loading "🔄 Preparing Chrome cookies (Tanzania-optimized)"
-
+echo -e "\033[38;5;39m🔄 Preparing Chrome cookies (Tanzania-optimized)...\033[0m"
 pkill -f "chrome" 2>/dev/null || true
 pkill -f "chromium" 2>/dev/null || true
 pkill -f "crashpad" 2>/dev/null || true
+
+print_loading "⏳ Unlocking cookies"
 
 google-chrome-stable --no-startup-window 2>/dev/null &
 CHROME_PID=$!
 sleep 3
 kill $CHROME_PID 2>/dev/null || true
 wait $CHROME_PID 2>/dev/null || true
-echo -e "\033[38;5;46m✅ Cookies refreshed\033[0m"
+echo -e "\033[38;5;46m✅ Cookies refreshed in 8 seconds\033[0m"
 echo ""
 
 # === ROBUST DBUS SESSION SETUP ===
@@ -216,8 +131,8 @@ fi
 echo ""
 
 # URL input
-print_responsive_box_line $TERMINAL_WIDTH "paste YouTube link (video or playlist):"
-print_responsive_box_line $TERMINAL_WIDTH "> " "left"
+echo " paste YouTube link (video or playlist):"
+echo -n "> "
 read -r URL || { echo ""; exit 1; }
 URL=$(echo "$URL" | xargs)
 
@@ -228,10 +143,10 @@ fi
 echo ""
 
 # Download type selection
-print_responsive_box_line $TERMINAL_WIDTH "What to download?"
-print_responsive_box_line $TERMINAL_WIDTH " 1 = Single video (ignores playlist params in URL)"
-print_responsive_box_line $TERMINAL_WIDTH " 2 = Full playlist"
-print_responsive_box_line $TERMINAL_WIDTH "Enter choice (1/2) [default=1]: " "left"
+echo "What to download?"
+echo " 1 = Single video (ignores playlist params in URL)"
+echo " 2 = Full playlist"
+echo -n "Enter choice (1/2) [default=1]: "
 read -r TYPE_CHOICE || TYPE_CHOICE="1"
 TYPE_CHOICE="${TYPE_CHOICE:-1}"
 TYPE_CHOICE=$(echo "$TYPE_CHOICE" | xargs)
@@ -252,10 +167,10 @@ fi
 echo ""
 
 # Format selection
-print_responsive_box_line $TERMINAL_WIDTH "Download as:"
-print_responsive_box_line $TERMINAL_WIDTH " 1 = Video (with audio)"
-print_responsive_box_line $TERMINAL_WIDTH " 2 = MP3 (audio only)"
-print_responsive_box_line $TERMINAL_WIDTH "Enter choice (1/2) [default=1]: " "left"
+echo "Download as:"
+echo " 1 = Video (with audio)"
+echo " 2 = MP3 (audio only)"
+echo -n "Enter choice (1/2) [default=1]: "
 read -r FORMAT_CHOICE || FORMAT_CHOICE="1"
 FORMAT_CHOICE="${FORMAT_CHOICE:-1}"
 FORMAT_CHOICE=$(echo "$FORMAT_CHOICE" | xargs)
@@ -270,11 +185,11 @@ if [[ "$FORMAT_CHOICE" == "2" ]]; then
     MP3_FLAGS="-x --audio-format mp3"
     
     echo ""
-    print_responsive_box_line $TERMINAL_WIDTH "MP3 quality options:"
-    print_responsive_box_line $TERMINAL_WIDTH " 1 = Best (VBR ~320kbps)"
-    print_responsive_box_line $TERMINAL_WIDTH " 2 = High (192kbps)"
-    print_responsive_box_line $TERMINAL_WIDTH " 3 = Medium (128kbps)"
-    print_responsive_box_line $TERMINAL_WIDTH "Enter choice (1-3) [default=1]: " "left"
+    echo "MP3 quality options:"
+    echo " 1 = Best (VBR ~320kbps)"
+    echo " 2 = High (192kbps)"
+    echo " 3 = Medium (128kbps)"
+    echo -n "Enter choice (1-3) [default=1]: "
     read -r QUAL_CHOICE || QUAL_CHOICE="1"
     QUAL_CHOICE="${QUAL_CHOICE:-1}"
     QUAL_CHOICE=$(echo "$QUAL_CHOICE" | xargs)
@@ -290,13 +205,13 @@ if [[ "$FORMAT_CHOICE" == "2" ]]; then
 fi
 echo ""
 
-# === ENHANCED QUALITY SELECTION ===
+# === ENHANCED QUALITY SELECTION (ALL STANDARD RESOLUTIONS ≥360P) ===
 if [[ "$IS_MP3" == "false" ]]; then
     echo -e "\033[38;5;39m🔍 Fetching available qualities... (usually 2-5 seconds)\033[0m"
     
     ACTUAL_HEIGHTS=$(timeout 15 yt-dlp --cookies-from-browser chrome --no-playlist \
         --print "%(height)s" "$URL" 2>/dev/null | \
-        grep -E '^[0-9]+$' | sort -nur | uniq | head -10 || echo "")
+        grep -E '^[0-9]+$' | sort -nur | uniq | head -n 10 || echo "")
     
     STANDARD_HEIGHTS=(2160 1440 1080 720 480 360)
     DISPLAY_HEIGHTS=""
@@ -320,13 +235,7 @@ if [[ "$IS_MP3" == "false" ]]; then
     DISPLAY_HEIGHTS=$(echo $DISPLAY_HEIGHTS | tr ' ' '\n' | sort -nur | uniq | tr '\n' ' ')
     
     echo -e "\033[38;5;46m✅ Available standard qualities: $DISPLAY_HEIGHTS\033[0m"
-    
-    # Responsive prompt
-    if [ "$TERMINAL_WIDTH" -ge 80 ]; then
-        echo -n "Enter max height (e.g. 720, 1080) [default=720]: "
-    else
-        echo -n "Max height? (720/1080) [720]: "
-    fi
+    echo -n "Enter max height (e.g. 720, 1080) [default=720]: "
     read -r MAX_HEIGHT || MAX_HEIGHT="720"
     MAX_HEIGHT="${MAX_HEIGHT:-720}"
     MAX_HEIGHT=$(echo "$MAX_HEIGHT" | xargs)
@@ -347,20 +256,16 @@ FOLDER_NAME=""
 USE_FOLDER="false"
 
 if [[ "$IS_PLAYLIST" == "true" ]]; then
-    if [ "$TERMINAL_WIDTH" -ge 80 ]; then
-        print_responsive_box_line $TERMINAL_WIDTH "📁 Create dedicated folder for playlist? (HIGHLY RECOMMENDED)"
-        print_responsive_box_line $TERMINAL_WIDTH "   Prevents mixing files from playlists with identical names"
-        print_responsive_box_line $TERMINAL_WIDTH "   y = Yes (safe default) | n = No [default=y]: " "left"
-    else
-        echo "📁 Folder for playlist? (y/n) [y]: "
-    fi
+    echo "📁 Create dedicated folder for playlist? (HIGHLY RECOMMENDED)"
+    echo "   Prevents mixing files from playlists with identical names"
+    echo -n "   y = Yes (safe default) | n = No [default=y]: "
     read -r FOLDER_CHOICE || FOLDER_CHOICE="y"
     FOLDER_CHOICE="${FOLDER_CHOICE:-y}"
     FOLDER_CHOICE=$(echo "$FOLDER_CHOICE" | xargs | tr '[:upper:]' '[:lower:]')
     
     if [[ "${FOLDER_CHOICE}" == "y" || "${FOLDER_CHOICE}" == "" ]]; then
         USE_FOLDER="true"
-        echo -n "Folder name? (blank for auto): "
+        echo -n "Folder name? (leave blank for auto): "
         read -r FOLDER_NAME || FOLDER_NAME=""
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
         FOLDER_NAME="${FOLDER_NAME:-%(playlist_title)s [%(playlist_id)s]}"
@@ -369,14 +274,14 @@ if [[ "$IS_PLAYLIST" == "true" ]]; then
         OUTPUT_TEMPLATE="%(playlist_index)02d - %(title)s.%(ext)s"
     fi
 else
-    echo -n "📁 Save in custom folder? (y/n) [n]: "
+    echo -n "📁 Save in custom folder? (y/n) [default=n]: "
     read -r FOLDER_CHOICE || FOLDER_CHOICE="n"
     FOLDER_CHOICE="${FOLDER_CHOICE:-n}"
     FOLDER_CHOICE=$(echo "$FOLDER_CHOICE" | xargs | tr '[:upper:]' '[:lower:]')
     
     if [[ "${FOLDER_CHOICE}" == "y" ]]; then
         USE_FOLDER="true"
-        echo -n "Folder name: "
+        echo -n "Folder name (e.g. 'BongoFlava'): "
         read -r FOLDER_NAME || FOLDER_NAME="Downloads"
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
         FOLDER_NAME="${FOLDER_NAME:-Downloads}"
@@ -402,25 +307,14 @@ if [[ "$IS_PLAYLIST" == "false" && -n "$VIDEO_ID" ]]; then
     if grep -qxF "$VIDEO_ID" "$ARCHIVE_FILE" 2>/dev/null; then
         print_error "⚠️  ⚠️  ⚠️  VIDEO ALREADY IN ARCHIVE  ⚠️  ⚠️  ⚠️"
         echo ""
-        
-        if [ "$TERMINAL_WIDTH" -ge 70 ]; then
-            echo "   Video ID: $VIDEO_ID"
-            echo "   ⚠️  Archive only means yt-dlp *attempted* download before"
-            echo "   ⚠️  File might be MISSING or CORRUPTED!"
-            echo ""
-            echo "   Options:"
-            echo "     y = YES → Delete from archive + re-download"
-            echo "     n = NO  → Skip download (safe default)"
-            echo -n "   Delete from archive and re-download? (y/N): "
-        else
-            echo "   Video: $VIDEO_ID"
-            echo "   Already in archive!"
-            echo ""
-            echo "   y = Delete & redownload"
-            echo "   n = Skip [default]"
-            echo -n "   Choice? (y/N): "
-        fi
-        
+        echo "   Video ID: $VIDEO_ID"
+        echo "   ⚠️  Archive only means yt-dlp *attempted* download before"
+        echo "   ⚠️  File might be MISSING or CORRUPTED!"
+        echo ""
+        echo "   Options:"
+        echo "     y = YES → Delete from archive + re-download"
+        echo "     n = NO  → Skip download (safe default)"
+        echo -n "   Delete from archive and re-download? (y/N): "
         read -r CHOICE
         CHOICE=$(echo "${CHOICE:-n}" | tr '[:upper:]' '[:lower:]')
         echo ""
@@ -428,7 +322,7 @@ if [[ "$IS_PLAYLIST" == "false" && -n "$VIDEO_ID" ]]; then
         if [[ "$CHOICE" == "y" ]]; then
             grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
             mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-            echo -e "\033[38;5;46m✅ DELETED $VIDEO_ID from archive. Proceeding...\033[0m"
+            echo -e "\033[38;5;46m✅ DELETED $VIDEO_ID from archive. Proceeding with fresh download...\033[0m"
             echo ""
         else
             echo -e "\033[38;5;46m✅ SKIPPED download per your choice.\033[0m"
@@ -441,25 +335,15 @@ if [[ "$IS_PLAYLIST" == "true" ]]; then
     ARCHIVE_FLAG="--download-archive $ARCHIVE_FILE"
 fi
 
-# Responsive execution summary
+# Execution summary
 echo -e "\033[38;5;39m🚀 STARTING DOWNLOAD\033[0m"
-print_responsive_separator $TERMINAL_WIDTH
-
-summary_width=$((TERMINAL_WIDTH < 60 ? 60 : TERMINAL_WIDTH))
-
-if [ "$summary_width" -ge 70 ]; then
-    print_responsive_box_line $summary_width "URL:          $(echo "$URL" | cut -c1-$((summary_width-20)))"
-    print_responsive_box_line $summary_width "Type:         $( [[ "$IS_PLAYLIST" == "true" ]] && echo "Playlist (ALL videos)" || echo "Single Video ONLY" )"
-    print_responsive_box_line $summary_width "Format:       $( [[ "$IS_MP3" == "true" ]] && echo "MP3 ($AUDIO_QUAL)" || echo "Video (max ${MAX_HEIGHT}p) WITH AUDIO" )"
-    print_responsive_box_line $summary_width "Destination:  $( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
-    print_responsive_box_line $summary_width "JS Runtime:   $( [[ -n "$JS_RUNTIME" ]] && echo "${JS_RUNTIME##*=}" || echo "None" )"
-else
-    print_responsive_box_line $summary_width "Type: $( [[ "$IS_PLAYLIST" == "true" ]] && echo "Playlist" || echo "Single" )"
-    print_responsive_box_line $summary_width "Format: $( [[ "$IS_MP3" == "true" ]] && echo "MP3" || echo "Video ${MAX_HEIGHT}p" )"
-    print_responsive_box_line $summary_width "Dest: $( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current" )"
-fi
-
-print_responsive_separator $TERMINAL_WIDTH
+echo "──────────────────────────────────────────────────────────────"
+echo " URL:          $URL"
+echo " Type:         $( [[ "$IS_PLAYLIST" == "true" ]] && echo "Playlist (ALL videos)" || echo "Single Video ONLY" )"
+echo " Format:       $( [[ "$IS_MP3" == "true" ]] && echo "MP3 ($AUDIO_QUAL)" || echo "Video (max ${MAX_HEIGHT}p) WITH AUDIO" )"
+echo " Destination:  $( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
+echo " JS Runtime:   $( [[ -n "$JS_RUNTIME" ]] && echo "${JS_RUNTIME##*=}" || echo "None" )"
+echo "──────────────────────────────────────────────────────────────"
 echo ""
 
 # === FIXED yt-dlp COMMAND (WITH ANIMATED RETRIES) ===
@@ -500,63 +384,40 @@ done
 if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     echo ""
     print_error "❌ DOWNLOAD FAILED AFTER 3 ATTEMPTS"
-    
-    if [ "$TERMINAL_WIDTH" -ge 70 ]; then
-        echo "   💡 TANZANIA FIX:"
-        echo "     1. Disconnect WiFi/Ethernet"
-        echo "     2. Wait 10 seconds"
-        echo "     3. Reconnect and retry"
-    else
-        echo "   💡 FIX:"
-        echo "     1. Disconnect internet"
-        echo "     2. Wait 10s"
-        echo "     3. Reconnect"
-    fi
+    echo "   💡 TANZANIA FIX:"
+    echo "     1. Disconnect WiFi/Ethernet"
+    echo "     2. Wait 10 seconds"
+    echo "     3. Reconnect and retry"
     exit 1
 fi
 
-# === RESPONSIVE COMPLETION BOX ===
+# === PERFECTLY ALIGNED COMPLETION BOX (80 CHAR WIDTH) ===
 echo ""
-print_responsive_separator $TERMINAL_WIDTH
-print_responsive_box_line $TERMINAL_WIDTH "" "center"
-print_responsive_box_line $TERMINAL_WIDTH "✅ DOWNLOAD COMPLETE at $(date '+%I:%M:%S %p')" "center"
-print_responsive_box_line $TERMINAL_WIDTH "" "center"
-
-if [ "$TERMINAL_WIDTH" -ge 70 ]; then
-    print_responsive_box_line $TERMINAL_WIDTH "Files saved: $( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
-    print_responsive_box_line $TERMINAL_WIDTH "• Mode: $( [[ "$IS_PLAYLIST" == "true" ]] && echo "FULL PLAYLIST" || echo "SINGLE VIDEO ONLY" )"
-    print_responsive_box_line $TERMINAL_WIDTH "• Audio: GUARANTEED (MP4 merge format)"
-    print_responsive_box_line $TERMINAL_WIDTH "• Quality: Standard resolutions (360p-4K) always available"
-    print_responsive_box_line $TERMINAL_WIDTH "" "center"
-    print_responsive_box_line $TERMINAL_WIDTH "💡 TANZANIA TIPS:" "center"
-    print_responsive_box_line $TERMINAL_WIDTH "• Single video? Script IGNORES ?list= params"
-    print_responsive_box_line $TERMINAL_WIDTH "• Audio missing? Re-download at 720p"
-    print_responsive_box_line $TERMINAL_WIDTH "• Bot errors? Script auto-refreshes cookies"
-    print_responsive_box_line $TERMINAL_WIDTH "• Slow network? 720p works 95% of time"
-else
-    print_responsive_box_line $TERMINAL_WIDTH "Saved: $( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Here" )"
-    print_responsive_box_line $TERMINAL_WIDTH "Mode: $( [[ "$IS_PLAYLIST" == "true" ]] && echo "Playlist" || echo "Single" )"
-    print_responsive_box_line $TERMINAL_WIDTH "Audio: ✓ Guaranteed"
-    print_responsive_box_line $TERMINAL_WIDTH "" "center"
-    print_responsive_box_line $TERMINAL_WIDTH "💡 TIPS:" "center"
-    print_responsive_box_line $TERMINAL_WIDTH "• Single? Ignores ?list= params"
-    print_responsive_box_line $TERMINAL_WIDTH "• Audio missing? Try 720p"
-    print_responsive_box_line $TERMINAL_WIDTH "• Slow network? Use 720p"
-fi
-
-print_responsive_box_line $TERMINAL_WIDTH "" "center"
-print_responsive_box_line $TERMINAL_WIDTH "Enjoy your downloads! 🌍✨" "center"
-print_responsive_box_line $TERMINAL_WIDTH "Made with ❤️ for Tanzania by Johnbosco" "center"
-print_responsive_box_line $TERMINAL_WIDTH "" "center"
-print_responsive_box_bottom $TERMINAL_WIDTH
+echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+echo "║                                                                              ║"
+printf "║ %-76s ║\n" "✅ DOWNLOAD COMPLETE at $(date '+%I:%M:%S %p')"
+echo "║                                                                              ║"
+printf "║ %-76s ║\n" "Files saved: $( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
+printf "║ %-76s ║\n" "• Mode: $( [[ "$IS_PLAYLIST" == "true" ]] && echo "FULL PLAYLIST" || echo "SINGLE VIDEO ONLY" )"
+printf "║ %-76s ║\n" "• Audio: GUARANTEED (MP4 merge format)"
+printf "║ %-76s ║\n" "• Quality: Standard resolutions (360p-4K) always available"
+echo "║                                                                              ║"
+echo "║   💡 TANZANIA TIPS:                                                          ║"
+printf "║ %-76s ║\n" "• Single video? Script IGNORES ?list= params"
+printf "║ %-76s ║\n" "• Audio missing? Re-download at 720p (most reliable streams)"
+printf "║ %-76s ║\n" "• Bot errors? Script auto-refreshes cookies"
+printf "║ %-76s ║\n" "• Slow network? 720p works 95% of time on Vodacom/Airtel"
+echo "║                                                                              ║"
+printf "║ %-76s ║\n" "Enjoy your downloads! 🌍✨"
+printf "║ %-76s ║\n" "Made with ❤️ for Tanzania by Johnbosco (Dar es Salaam)"
+echo "║                                                                              ║"
+echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
 
-# === RESPONSIVE SIGNATURE ===
-echo -e "\033[38;5;194m\"Out here doing some Alien things, Jesus is King...\" ~johnboscocjt\033[0m"
+# === SIGNATURE: QUOTE FROM JOHN BOSCO + ALIEN ART (GREEN) ===
+echo -e "\033[38;5;194m\"Out here doing some Alien things, Jesus is King...\" ~johnboscocjt (Isaiah 28:21)\033[0m"
 echo -e "\033[38;5;82m"
-
-if [ "$TERMINAL_WIDTH" -ge 100 ]; then
-    cat << 'EOF'
+cat << 'EOF'
                                     ¸¸,..--------------------.....,¸
                       ¸,..--··˜˜¨¨                                     ¨¨˜·.¸
                  ¸.·˜                                                          ˜·¸
@@ -574,7 +435,7 @@ if [ "$TERMINAL_WIDTH" -ge 100 ]; then
               ˜·¸   ·¨¸¸,,,.˜ .,¸                               ¸,.·˜¨
                   ˜¨¸           ¯˜·¸              ¸.···˜˜·¸.·˜¨¸/
                      ˜·¸¸¸,,,,¸¸¸¸   ˜¸         ¸·˜   ¸.·˜,˜ ¸·˜¨
-                        ¸¨˜˜˜'˜¨¨¯'   ˜¸       ˜¸,.·˜¸;     \¸
+                        ¨¸¨˜˜˜'˜¨¨¯'   ˜¸       ˜¸,.·˜¸;     \¸
                           ˜¸            ˜¸.   ¸·˜;;;˜         '¸
                            ˜¸¸          ¸,.-·¨¸;;;              '¸
                           ¸,·´¯¨˜˜˜¨¯¯;;;;;;;˜                 ˜.,¸¸¸
@@ -583,15 +444,5 @@ if [ "$TERMINAL_WIDTH" -ge 100 ]; then
   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  ;;
     ¨¨¨¨¨¨¨¨˜˜˜˜˜˜˜˜''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''˜˜˜˜˜˜˜˜˜˜˜¨
 EOF
-elif [ "$TERMINAL_WIDTH" -ge 60 ]; then
-    cat << 'EOF'
-            ,..------------------....,
-     ,..--··˜¨¨               ¨¨˜·.¸
-  ¸.·˜                              ˜·¸
- ¸·˜                              ¸˜   ˜¸
-·''                            ¸ ·  ˜¸  ˜
-¨  ¸¸˜                   ¸.·˜¸ ·˜
-'     ˜·¸          ¸,..--·.¸
-'¸¸¸      ˜-.¸  ¸,..---···-¸˜¨¸
-·˜¸¸¸¸¸¸¯¯˜·.¸  ¸,-·˜;;;;;;¸'˜
- ¸·˜ ;;;;;;,˜·¸ ¸
+echo -e "\033[0m"
+echo ""
