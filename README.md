@@ -135,6 +135,29 @@ sudo chmod +x /usr/local/bin/YutubuDownload
 
 ---
 
+## 📸 Screenshots
+
+<div align="center">
+  
+### **1. Terminal Interface & Main Menu**
+![Main Interface](Screenshots/1.png)
+
+### **2. URL Input & Processing**
+![URL Processing](Screenshots/2.png)
+
+### **3. Format Selection (Video/MP3)**
+![Format Selection](Screenshots/3.png)
+
+### **4. Quality Selection & Download Progress**
+![Download Progress](Screenshots/4.png)
+
+### **5. Completion & File Organization**
+![Completion Screen](Screenshots/5.png)
+
+</div>
+
+---
+
 ## ❓ Why Built for Tanzania?
 
 > *"As a developer in Dar es Salaam, I created YutubuDownload to solve real problems Tanzanian users face daily:*  
