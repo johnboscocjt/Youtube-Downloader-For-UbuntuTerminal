@@ -583,22 +583,25 @@ fi
 echo ""
 echo -e "${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at %-52s ${BRIGHT_GREEN}║${RESET}\n" "$(date '+%I:%M:%S %p')"
+echo -e "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at $(date '+%I:%M:%S %p')                                           ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 
-# Files saved line
+# Create strings with proper formatting
 if [[ "$USE_FOLDER" == "true" ]]; then
-    printf $'%b%-61s%b%b\n' "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}" "$FOLDER_NAME" "${RESET}" "${BRIGHT_GREEN}║${RESET}"
+    FILES_LINE="${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}$FOLDER_NAME${RESET}"
 else
-    printf $'%bCurrent directory%-47s%b%b\n' "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}" "" "${RESET}" "${BRIGHT_GREEN}║${RESET}"
+    FILES_LINE="${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}Current directory${RESET}"
 fi
 
-# Mode line  
 if [[ "$IS_PLAYLIST" == "true" ]]; then
-    printf $'%bFULL PLAYLIST%-55s%b%b\n' "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_GREEN}" "" "${RESET}" "${BRIGHT_GREEN}║${RESET}"
+    MODE_LINE="${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_GREEN}FULL PLAYLIST${RESET}"
 else
-    printf $'%bSINGLE VIDEO ONLY%-51s%b%b\n' "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_BLUE}" "" "${RESET}" "${BRIGHT_GREEN}║${RESET}"
+    MODE_LINE="${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_BLUE}SINGLE VIDEO ONLY${RESET}"
 fi
+
+# Print with echo -e and manual spacing
+echo -e "$FILES_LINE                                                    ${BRIGHT_GREEN}║${RESET}"
+echo -e "$MODE_LINE                                                     ${BRIGHT_GREEN}║${RESET}"
 
 echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
