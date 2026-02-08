@@ -391,7 +391,7 @@ echo "╔═══════════════════════�
 echo "║                                                                              ║"
 # Hand-padded lines for Emoji alignment (each emoji counts as 2 spaces visually)
 printf "║ ✅ DOWNLOAD COMPLETE at %-53s ║\n" "$(date '+%I:%M:%S %p')"
-echo "║                                                                              ║"
+echo "║                                                                             ║"
 printf "║ Files saved: %-63s ║\n" "$( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
 printf "║ • Mode: %-68s ║\n" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "FULL PLAYLIST" || echo "SINGLE VIDEO ONLY" )"
 printf "║ • Audio: GUARANTEED (MP4 merge format)                                       ║\n"
@@ -401,10 +401,10 @@ echo "║    💡 TANZANIA TIPS:                                                
 printf "║ • Single video? Script IGNORES ?list= params                                 ║\n"
 printf "║ • Audio missing? Re-download at 720p (most reliable streams)                 ║\n"
 printf "║ • Bot errors? Script auto-refreshes cookies                                  ║\n"
-printf "║ • Slow network? 720p works 95% of time on Vodacom/Airtel                     ║\n"
+printf "║ • Slow network? 720p works 95% of time on Vodacom/Airtel                       ║\n"
 echo "║                                                                              ║"
 # Hand-padded for 2-character wide emojis
-printf "║ Enjoy your downloads! 🌍✨                                                    ║\n"
+printf "║ Enjoy your downloads! 🌍✨                                                   ║\n"
 printf "║ Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)                       ║\n"
 echo "║                                                                              ║"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
