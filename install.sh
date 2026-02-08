@@ -190,26 +190,45 @@ else
     exit 1
 fi
 
-# === PERFECT 80-CHAR TANZANIAN FLAG BOX (ANIMATED) ===
+# === YOUR EXACT COMPLETION BOX (UNCHANGED) ===
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════════════════╗"
 echo "║                                                                              ║"
+echo "║ ✅ INSTALLATION COMPLETE!                                                   ║"
+echo "║                                                                              ║"
+echo "║   Next steps:                                                                ║"
+echo "║ 1. CLOSE ALL CHROME WINDOWS COMPLETELY (required for cookies)                ║"
+echo "║ 2. Open terminal and run:                                                    ║"
+echo "║    cd ~/youtubedownloading && YutubuDownload                                 ║"
+echo "║ 3. Paste YouTube URL when prompted                                           ║"
+echo "║                                                                              ║"
+echo "║   💡 Tanzania Tip: Run during off-peak hours (after 10 PM EAT)               ║"
+echo "║    for best success on unstable networks                                     ║"
+echo "║                                                                              ║"
+echo "║ 🌍 Made with ❤️ for Tanzania by Johnbosco (Dar es Salaam)              ║"
+echo "║                                                                              ║"
+echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+echo ""
 
-# Animate each line with perfect width (78 chars content)
+# === PERFECT ANIMATED TANZANIAN FLAG (WITH COLORS + CLEAN BORDER) ===
+echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+echo "║                                                                              ║"
+
+# Animate each line with correct ANSI colors and exact 78-char width
 sleep 0.2
-printf "║%-78s║\n" "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓"
+echo -e "║\033[48;5;46m\033[38;5;46m$(printf '%78s' '')\033[0m║"
 sleep 0.15
-printf "║%-78s║\n" "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓"
+echo -e "║\033[48;5;46m\033[38;5;46m$(printf '%78s' '')\033[0m║"
 sleep 0.15
-printf "║%-78s║\n" "█████████████████████████████████████████████████████████████████████████"
+echo -e "║\033[48;5;220m\033[38;5;220m$(printf '%78s' '')\033[0m║"
 sleep 0.1
-printf "║%-78s║\n" "█████████████████████████████████████████████████████████████████████████"
+echo -e "║\033[48;5;0m\033[38;5;0m$(printf '%78s' '')\033[0m║"
 sleep 0.1
-printf "║%-78s║\n" "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓"
+echo -e "║\033[48;5;220m\033[38;5;220m$(printf '%78s' '')\033[0m║"
 sleep 0.15
-printf "║%-78s║\n" "▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒"
+echo -e "║\033[48;5;39m\033[38;5;39m$(printf '%78s' '')\033[0m║"
 sleep 0.15
-printf "║%-78s║\n" "▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒"
+echo -e "║\033[48;5;39m\033[38;5;39m$(printf '%78s' '')\033[0m║"
 sleep 0.2
 
 echo "║                                                                              ║"
@@ -217,6 +236,7 @@ printf "║ %-76s ║\n" "🇹🇿  YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL 
 printf "║ %-76s ║\n" "Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
+
 echo "Version: YutubuDownload v1.0 (2026-02-08)"
 echo "Repository: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal"
 echo ""
