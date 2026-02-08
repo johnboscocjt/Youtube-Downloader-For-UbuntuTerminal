@@ -210,6 +210,22 @@ echo "║                                                                       
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
 
+# === COLORED TANZANIAN FLAG (NO ANIMATION, NO ERRORS, PERFECT BORDER) ===
+echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+echo "║                                                                              ║"
+echo -e "║\033[48;5;46m$(printf '%78s' '')\033[0m║"  # Green
+echo -e "║\033[48;5;46m$(printf '%78s' '')\033[0m║"  # Green
+echo -e "║\033[48;5;220m$(printf '%78s' '')\033[0m║" # Gold
+echo -e "║\033[48;5;0m$(printf '%78s' '')\033[0m║"   # Black
+echo -e "║\033[48;5;220m$(printf '%78s' '')\033[0m║" # Gold
+echo -e "║\033[48;5;39m$(printf '%78s' '')\033[0m║"  # Blue
+echo -e "║\033[48;5;39m$(printf '%78s' '')\033[0m║"  # Blue
+echo "║                                                                              ║"
+printf "║ %-76s ║\n" "🇹🇿  YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL POWER  🇹🇿"
+printf "║ %-76s ║\n" "Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
+echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+echo ""
+
 echo "Version: YutubuDownload v1.0 (2026-02-08)"
 echo "Repository: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal"
 echo ""
