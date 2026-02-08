@@ -208,8 +208,8 @@ echo "║                                                                       
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
 
-printf "║" "  YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL POWER  "
-printf "║" "Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
+echo"║ YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL POWER  "
+echo"║ Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
 echo ""
 
 echo "Version: YutubuDownload v1.0 (2026-02-08)"
