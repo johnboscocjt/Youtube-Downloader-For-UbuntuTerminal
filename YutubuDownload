@@ -5,6 +5,84 @@
 
 set -euo pipefail
 
+# === PROGRESS BAR FUNCTIONS ===
+show_progress_bar() {
+    local progress="$1"
+    local total="$2"
+    local size=40
+    
+    # Calculate percentage
+    local percent=$((progress * 100 / total))
+    local filled=$((progress * size / total))
+    local empty=$((size - filled))
+    
+    # Create progress bar
+    local bar="["
+    for ((i=0; i<filled; i++)); do bar+="█"; done
+    for ((i=0; i<empty; i++)); do bar+="░"; done
+    bar+="]"
+    
+    # Format with colors
+    if [ $percent -lt 30 ]; then
+        echo -ne "\033[38;5;196m"
+    elif [ $percent -lt 70 ]; then
+        echo -ne "\033[38;5;214m"
+    else
+        echo -ne "\033[38;5;46m"
+    fi
+    
+    printf "Downloading: %s %3d%%" "$bar" "$percent"
+    
+    # Show MB if we have the info
+    if [ $# -ge 4 ]; then
+        local current_mb="$3"
+        local total_mb="$4"
+        printf " [%.1fMB/%.1fMB]" "$current_mb" "$total_mb"
+    fi
+    
+    # Show ETA if available
+    if [ $# -ge 5 ] && [ -n "$5" ] && [ "$5" != "0" ]; then
+        local eta_seconds="$5"
+        local eta_minutes=$((eta_seconds / 60))
+        local eta_seconds_remain=$((eta_seconds % 60))
+        printf " | ETA: %02d:%02d" "$eta_minutes" "$eta_seconds_remain"
+    fi
+    
+    # Show speed if available
+    if [ $# -ge 6 ] && [ -n "$6" ]; then
+        local speed="$6"
+        printf " | Speed: %s" "$speed"
+    fi
+    
+    echo -ne "\r"
+}
+
+# Function to format bytes to human readable
+format_bytes() {
+    local bytes="$1"
+    if (( bytes >= 1073741824 )); then
+        echo "$(echo "scale=1; $bytes/1073741824" | bc)GB/s"
+    elif (( bytes >= 1048576 )); then
+        echo "$(echo "scale=1; $bytes/1048576" | bc)MB/s"
+    elif (( bytes >= 1024 )); then
+        echo "$(echo "scale=1; $bytes/1024" | bc)KB/s"
+    else
+        echo "${bytes}B/s"
+    fi
+}
+
+# Function to format seconds to MM:SS
+format_seconds() {
+    local seconds="$1"
+    if [ -z "$seconds" ] || [ "$seconds" = "0" ]; then
+        echo "00:00"
+    else
+        local mins=$((seconds / 60))
+        local secs=$((seconds % 60))
+        printf "%02d:%02d" "$mins" "$secs"
+    fi
+}
+
 # === ANIMATED FEEDBACK FUNCTIONS ===
 print_loading() {
     local msg="$1"
@@ -248,6 +326,7 @@ echo ""
 # Folder organization
 FOLDER_NAME=""
 USE_FOLDER="false"
+SAVE_LOCATION=""
 
 if [[ "$IS_PLAYLIST" == "true" ]]; then
     echo "📁 Create dedicated folder for playlist? (HIGHLY RECOMMENDED)"
@@ -264,8 +343,10 @@ if [[ "$IS_PLAYLIST" == "true" ]]; then
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
         FOLDER_NAME="${FOLDER_NAME:-%(playlist_title)s [%(playlist_id)s]}"
         OUTPUT_TEMPLATE="${FOLDER_NAME}/%(playlist_index)02d - %(title)s.%(ext)s"
+        SAVE_LOCATION="~/$(basename "$FOLDER_NAME")"
     else
         OUTPUT_TEMPLATE="%(playlist_index)02d - %(title)s.%(ext)s"
+        SAVE_LOCATION="~/"
     fi
 else
     echo -n "📁 Save in custom folder? (y/n) [default=n]: "
@@ -280,6 +361,9 @@ else
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
         FOLDER_NAME="${FOLDER_NAME:-Downloads}"
         OUTPUT_TEMPLATE="${FOLDER_NAME}/%(title)s.%(ext)s"
+        SAVE_LOCATION="~/$FOLDER_NAME"
+    else
+        SAVE_LOCATION="~/"
     fi
 fi
 echo ""
@@ -335,15 +419,20 @@ echo "────────────────────────�
 echo " URL:          $URL"
 echo " Type:         $( [[ "$IS_PLAYLIST" == "true" ]] && echo "Playlist (ALL videos)" || echo "Single Video ONLY" )"
 echo " Format:       $( [[ "$IS_MP3" == "true" ]] && echo "MP3 ($AUDIO_QUAL)" || echo "Video (max ${MAX_HEIGHT}p) WITH AUDIO" )"
-echo " Destination:  $( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
+echo " Destination:  $SAVE_LOCATION"
 echo " JS Runtime:   $( [[ -n "$JS_RUNTIME" ]] && echo "${JS_RUNTIME##*=}" || echo "None" )"
 echo "──────────────────────────────────────────────────────────────"
 echo ""
 
-# === FIXED yt-dlp COMMAND (WITH ANIMATED RETRIES) ===
+# === FANCY DOWNLOAD WITH PROGRESS BAR ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
-    if yt-dlp \
+    # Create a named pipe to capture progress
+    PIPE=$(mktemp -u)
+    mkfifo "$PIPE"
+    
+    # Start download in background
+    yt-dlp \
         $PLAYLIST_FLAG \
         $MP3_FLAGS \
         -f "$FORMAT" \
@@ -356,9 +445,98 @@ for ATTEMPT in 1 2 3; do
         --no-overwrites \
         --merge-output-format mp4 \
         $ARCHIVE_FLAG \
-        --progress \
-        "$URL" 2>&1; then
+        --progress-template "%(progress._percent_str)s|%(progress._total_bytes_str)s|%(progress._speed_str)s|%(progress._eta_str)s" \
+        "$URL" 2>&1 | tee "$PIPE" &
+    
+    DOWNLOAD_PID=$!
+    
+    # Variables for progress
+    PERCENTAGE=0
+    TOTAL_MB=0
+    CURRENT_MB=0
+    SPEED="0B/s"
+    ETA="00:00"
+    LAST_LINE=""
+    
+    # Show initial location
+    echo -e "\033[38;5;39mLocation: $SAVE_LOCATION\033[0m"
+    echo ""
+    
+    # Monitor progress
+    while kill -0 $DOWNLOAD_PID 2>/dev/null; do
+        # Read all available lines
+        while IFS= read -r line; do
+            if [[ -n "$line" ]]; then
+                LAST_LINE="$line"
+            fi
+        done < "$PIPE" 2>/dev/null || true
+        
+        # Parse progress if line contains progress info
+        if [[ "$LAST_LINE" =~ ([0-9.]+)%\|([0-9.]+[KMG]?iB)\|([0-9.]+[KMG]?iB/s)\|([0-9:]+) ]]; then
+            PERCENTAGE="${BASH_REMATCH[1]}"
+            TOTAL_STR="${BASH_REMATCH[2]}"
+            SPEED_STR="${BASH_REMATCH[3]}"
+            ETA_STR="${BASH_REMATCH[4]}"
+            
+            # Convert total to MB
+            if [[ "$TOTAL_STR" =~ ([0-9.]+)GiB ]]; then
+                TOTAL_MB=$(echo "${BASH_REMATCH[1]} * 1024" | bc -l 2>/dev/null || echo "0")
+            elif [[ "$TOTAL_STR" =~ ([0-9.]+)MiB ]]; then
+                TOTAL_MB="${BASH_REMATCH[1]}"
+            elif [[ "$TOTAL_STR" =~ ([0-9.]+)KiB ]]; then
+                TOTAL_MB=$(echo "${BASH_REMATCH[1]} / 1024" | bc -l 2>/dev/null || echo "0")
+            fi
+            
+            # Calculate current MB
+            CURRENT_MB=$(echo "$TOTAL_MB * $PERCENTAGE / 100" | bc -l 2>/dev/null || echo "0")
+            
+            # Format speed nicely
+            if [[ "$SPEED_STR" =~ ([0-9.]+)GiB/s ]]; then
+                SPEED_VALUE=$(echo "${BASH_REMATCH[1]} * 1024" | bc -l 2>/dev/null || echo "0")
+                SPEED="${SPEED_VALUE}MB/s"
+            elif [[ "$SPEED_STR" =~ ([0-9.]+)MiB/s ]]; then
+                SPEED="${BASH_REMATCH[1]}MB/s"
+            elif [[ "$SPEED_STR" =~ ([0-9.]+)KiB/s ]]; then
+                SPEED_VALUE=$(echo "${BASH_REMATCH[1]} / 1024" | bc -l 2>/dev/null || echo "0")
+                SPEED="${SPEED_VALUE}MB/s"
+            else
+                SPEED="$SPEED_STR"
+            fi
+            
+            # Convert ETA to seconds if needed
+            if [[ "$ETA_STR" =~ ([0-9]+):([0-9]+) ]]; then
+                ETA_MINUTES="${BASH_REMATCH[1]}"
+                ETA_SECONDS="${BASH_REMATCH[2]}"
+                ETA_TOTAL_SECONDS=$((ETA_MINUTES * 60 + ETA_SECONDS))
+                ETA="$ETA_STR"
+            else
+                ETA_TOTAL_SECONDS=0
+                ETA="00:00"
+            fi
+            
+            # Show progress bar with all info
+            show_progress_bar "$(printf "%.0f" "$PERCENTAGE")" "100" "$CURRENT_MB" "$TOTAL_MB" "$ETA_TOTAL_SECONDS" "$SPEED"
+        elif [[ "$LAST_LINE" =~ ([0-9.]+)% ]]; then
+            # Fallback if we only have percentage
+            PERCENTAGE="${BASH_REMATCH[1]}"
+            show_progress_bar "$(printf "%.0f" "$PERCENTAGE")" "100"
+        fi
+        
+        sleep 0.5
+    done
+    
+    # Clean up
+    wait $DOWNLOAD_PID
+    DOWNLOAD_EXIT_CODE=$?
+    rm -f "$PIPE"
+    
+    # Clear the progress line
+    echo -ne "\033[K"
+    
+    # Check if download succeeded
+    if [ $DOWNLOAD_EXIT_CODE -eq 0 ]; then
         DOWNLOAD_SUCCESS=true
+        echo -e "\033[38;5;46m✅ Download complete!\033[0m"
         break
     else
         echo ""
@@ -391,7 +569,7 @@ echo "╔═══════════════════════�
 echo "║                                                                              ║"
 printf "║ ✅ DOWNLOAD COMPLETE at %-52s ║\n" "$(date '+%I:%M:%S %p')"
 echo "║                                                                              ║"
-printf "║ Files saved: %-63s ║\n" "$( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
+printf "║ Files saved: %-63s ║\n" "$SAVE_LOCATION"
 printf "║ • Mode: %-68s ║\n" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "FULL PLAYLIST" || echo "SINGLE VIDEO ONLY" )"
 printf "║ • Audio: GUARANTEED (MP4 merge format)                                       ║\n"
 printf "║ • Quality: Standard resolutions (360p-4K) always available                   ║\n"
@@ -430,7 +608,7 @@ cat << 'EOF'
               ˜·¸   ·¨¸¸,,,.˜ .,¸                               ¸,.·˜¨
                   ˜¨¸           ¯˜·¸              ¸.···˜˜·¸.·˜¨¸/
                      ˜·¸¸¸,,,,¸¸¸¸   ˜¸         ¸·˜   ¸.·˜,˜ ¸·˜¨
-                        ¨¸¨˜˜˜'˜¨¨¯'   ˜¸       ˜¸,.·˜¸;     \¸
+                        ¸¨˜˜˜'˜¨¨¯'   ˜¸       ˜¸,.·˜¸;     \¸
                           ˜¸            ˜¸.   ¸·˜;;;˜         '¸
                            ˜¸¸          ¸,.-·¨¸;;;              '¸
                           ¸,·´¯¨˜˜˜¨¯¯;;;;;;;˜                 ˜.,¸¸¸
