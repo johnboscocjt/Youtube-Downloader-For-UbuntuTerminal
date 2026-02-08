@@ -28,6 +28,22 @@ LIME="\033[38;5;46m"
 SKY_BLUE="\033[38;5;39m"
 HOT_PINK="\033[38;5;196m"
 
+# === HELPER FUNCTION FOR PADDED COLORED OUTPUT ===
+print_padded() {
+    local label="$1"
+    local colored_text="$2"
+    local total_width=78  # Box width minus 2 for borders
+    
+    # Remove color codes to calculate actual text length
+    local plain_text=$(echo -e "$colored_text" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")
+    local text_length=${#plain_text}
+    local label_length=${#label}
+    local total_length=$((label_length + text_length))
+    local padding=$((total_width - total_length))
+    
+    printf "${BRIGHT_GREEN}║${RESET} ${CYAN}%s${RESET} %s%*s ${BRIGHT_GREEN}║${RESET}\n" "$label" "$colored_text" "$padding" ""
+}
+
 # === ANIMATED FEEDBACK FUNCTIONS ===
 print_loading() {
     local msg="$1"
@@ -568,21 +584,24 @@ echo -e "${BRIGHT_GREEN}╔═════════════════�
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at %-52s ${BRIGHT_GREEN}║${RESET}\n" "$(date '+%I:%M:%S %p')"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-printf "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} %-63s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$USE_FOLDER" == "true" ]] && echo "${BRIGHT_YELLOW}$FOLDER_NAME${RESET}" || echo "${BRIGHT_YELLOW}Current directory${RESET}" )"
-printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} %-68s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}FULL PLAYLIST${RESET}" || echo "${BRIGHT_BLUE}SINGLE VIDEO ONLY${RESET}" )"
-printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
-printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
-echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+
+# Use the helper function for colored text with proper padding
+print_padded "Files saved:" "$( [[ "$USE_FOLDER" == "true" ]] && echo "${BRIGHT_YELLOW}$FOLDER_NAME${RESET}" || echo "${BRIGHT_YELLOW}Current directory${RESET}" )"
+print_padded "• Mode:" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}FULL PLAYLIST${RESET}" || echo "${BRIGHT_BLUE}SINGLE VIDEO ONLY${RESET}" )"
+
+# Static lines (no color variables)
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}    ${BRIGHT_CYAN}💡 TANZANIA TIPS:${RESET}                                                         ${BRIGHT_GREEN}║${RESET}"
-printf "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Single video? Script ${BRIGHT_GREEN}IGNORES ?list= params${RESET}                                 ${BRIGHT_GREEN}║${RESET}"
-printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Audio missing? ${BRIGHT_YELLOW}Re-download at 720p${RESET} (most reliable streams)                 ${BRIGHT_GREEN}║${RESET}"
-printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Bot errors? Script ${BRIGHT_GREEN}auto-refreshes cookies${RESET}                                  ${BRIGHT_GREEN}║${RESET}"
-printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Slow network? ${BRIGHT_YELLOW}720p works 95% of time on Vodacom/Airtel${RESET}                       ${BRIGHT_GREEN}║${RESET}"
-echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-# Hand-padded for 2-character wide emojis
-printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_MAGENTA}Enjoy your downloads! 🌍✨${RESET}                                                   ${BRIGHT_GREEN}║${RESET}"
-printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)${RESET}                       ${BRIGHT_GREEN}║${RESET}"
-echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Single video? Script ${BRIGHT_GREEN}IGNORES ?list= params${RESET}                                 ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Audio missing? ${BRIGHT_YELLOW}Re-download at 720p${RESET} (most reliable streams)                 ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Bot errors? Script ${BRIGHT_GREEN}auto-refreshes cookies${RESET}                                  ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Slow network? ${BRIGHT_YELLOW}720p works 95% of time on Vodacom/Airtel${RESET}                       ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${BRIGHT_MAGENTA}Enjoy your downloads! 🌍✨${RESET}                                                   ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)${RESET}                       ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${RESET}"
 echo ""
 
