@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 08, 2026
-# GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal 
+# GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
 
 set -euo pipefail
 
@@ -90,7 +90,7 @@ else
     else
         print_error "⚠️  Warning: yt-venv not found at ~/youtubedownloading/yt-venv"
         echo "   Cookie decryption may fail. Run installer:"
-        echo "   sudo bash -c '\$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh )'"
+        echo "   sudo bash -c '\$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)'"
     fi
 fi
 
@@ -100,7 +100,7 @@ echo ""
 if ! command -v yt-dlp &> /dev/null; then
     print_error "❌ ERROR: yt-dlp not found!"
     echo "   Install with installer:"
-    echo "   sudo bash -c '\$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh )'"
+    echo "   sudo bash -c '\$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)'"
     exit 1
 fi
 
@@ -120,7 +120,7 @@ elif command -v node &> /dev/null; then
     echo -e "\033[38;5;39m⚡ Using Node.js for YouTube JS challenges\033[0m"
 else
     print_error "⚠️  WARNING: No JS runtime found! YouTube may block high-quality downloads."
-    echo "   Install Deno (recommended): curl -fsSL https://deno.land/install.sh  | sh"
+    echo "   Install Deno (recommended): curl -fsSL https://deno.land/install.sh | sh"
 fi
 echo ""
 
@@ -340,7 +340,23 @@ echo " JS Runtime:   $( [[ -n "$JS_RUNTIME" ]] && echo "${JS_RUNTIME##*=}" || ec
 echo "──────────────────────────────────────────────────────────────"
 echo ""
 
-# === FIXED yt-dlp COMMAND (WITH ANIMATED RETRIES) ===
+# === BEAUTIFUL PROGRESS BAR HANDLER ===
+PROGRESS_CMD="--progress"
+YT_DLP_VERSION=$(yt-dlp --version 2>/dev/null | head -n1 || echo "2021.01.01")
+
+# Check if modern progress template is supported (yt-dlp >= 2023.07.06)
+if printf '%s\n2023.07.06' "$YT_DLP_VERSION" | sort -V -C 2>/dev/null; then
+    # Modern yt-dlp: Use beautiful Unicode block bar
+    PROGRESS_CMD="--progress-template \$'download:Downloading: {progress_bar} {progress_pct}% [{downloaded_bytes}/{total_bytes}]\\nETA: {eta} | Speed: {speed} | Location: ${FOLDER_NAME:-Current directory}'"
+else
+    # Fallback for older versions: Enhanced standard progress
+    PROGRESS_CMD="--progress --console-title"
+    echo -e "\033[38;5;214m⚠️  Using standard progress bar (upgrade yt-dlp for Unicode blocks):\033[0m"
+    echo "   pip install -U yt-dlp"
+    echo ""
+fi
+
+# === FIXED yt-dlp COMMAND WITH BEAUTIFUL PROGRESS ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
     if yt-dlp \
@@ -356,8 +372,14 @@ for ATTEMPT in 1 2 3; do
         --no-overwrites \
         --merge-output-format mp4 \
         $ARCHIVE_FLAG \
-        --progress \
-        "$URL" 2>&1; then
+        $PROGRESS_CMD \
+        "$URL" 2>&1 | while IFS= read -r line; do
+            # Clean up yt-dlp's JSON progress artifacts (if any)
+            if [[ "$line" == *"{"* ]] && [[ "$line" == *"}"* ]] && [[ "$line" != *"error"* ]]; then
+                continue
+            fi
+            echo "$line"
+        done; then
         DOWNLOAD_SUCCESS=true
         break
     else
@@ -367,8 +389,10 @@ for ATTEMPT in 1 2 3; do
             pkill -f "chrome" 2>/dev/null || true
             sleep 3
             google-chrome-stable --no-startup-window 2>/dev/null &
+            CHROME_PID=$!
             sleep 3
-            pkill -f "chrome" 2>/dev/null || true
+            kill $CHROME_PID 2>/dev/null || true
+            wait $CHROME_PID 2>/dev/null || true
             echo -e "\033[38;5;39m🔄 Retrying (attempt $((ATTEMPT + 1))...\033[0m"
             sleep 2
         fi
