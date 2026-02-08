@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # YutubuDownload Installer - Tanzania-Optimized YouTube Downloader
-# Author: Johnbosco | Updated: February 06, 2026
+# Author: Johnbosco | Updated: February 08, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
 
-# Exit on critical errors only (don't fail on non-critical steps)
+# Exit on critical errors only
 set -uo pipefail
 
 # Check root privileges
@@ -177,24 +177,53 @@ else
     exit 1
 fi
 
+# === PERFECT 80-CHAR COMPLETION BOX (UNCHANGED) ===
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════════════════╗"
 echo "║                                                                              ║"
-echo "║   ✅ INSTALLATION COMPLETE!                                                   ║"
+printf "║ %-76s ║\n" "✅ INSTALLATION COMPLETE!"
 echo "║                                                                              ║"
 echo "║   Next steps:                                                                ║"
-echo "║   1. CLOSE ALL CHROME WINDOWS COMPLETELY (required for cookies)              ║"
-echo "║   2. Open terminal and run:                                                  ║"
-echo "║        cd ~/youtubedownloading && YutubuDownload                             ║"
-echo "║   3. Paste YouTube URL when prompted                                         ║"
+printf "║ %-76s ║\n" "1. CLOSE ALL CHROME WINDOWS COMPLETELY (required for cookies)"
+printf "║ %-76s ║\n" "2. Open terminal and run:"
+printf "║ %-76s ║\n" "   cd ~/youtubedownloading && YutubuDownload"
+printf "║ %-76s ║\n" "3. Paste YouTube URL when prompted"
 echo "║                                                                              ║"
 echo "║   💡 Tanzania Tip: Run during off-peak hours (after 10 PM EAT)               ║"
-echo "║      for best success on unstable networks                                   ║"
+printf "║ %-76s ║\n" "   for best success on unstable networks"
 echo "║                                                                              ║"
-echo "║   🌍 Made with ❤️ for Tanzania by Johnbosco (Dar es Salaam)                  ║"
+printf "║ %-76s ║\n" "🌍 Made with ❤️ for Tanzania by Johnbosco (Dar es Salaam)"
 echo "║                                                                              ║"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
-echo "Version: YutubuDownload v1.0 (2026-02-06)"
+
+# === ANIMATED TANZANIAN FLAG (OFFICIAL COLORS) ===
+echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+echo "║                                                                              ║"
+
+# Animate flag line by line (Tanzania colors)
+sleep 0.2
+echo -e "\033[48;5;46m\033[38;5;46m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\033[0m"
+sleep 0.15
+echo -e "\033[48;5;46m\033[38;5;46m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\033[0m"
+sleep 0.15
+echo -e "\033[48;5;220m\033[38;5;220m█████████████████████████████████████████████████████████████████████████\033[0m"
+sleep 0.1
+echo -e "\033[48;5;0m\033[38;5;0m█████████████████████████████████████████████████████████████████████████\033[0m"
+sleep 0.1
+echo -e "\033[48;5;220m\033[38;5;220m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\033[0m"
+sleep 0.15
+echo -e "\033[48;5;39m\033[38;5;39m▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒\033[0m"
+sleep 0.15
+echo -e "\033[48;5;39m\033[38;5;39m▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒\033[0m"
+sleep 0.2
+
+echo "║                                                                              ║"
+printf "║ %-76s ║\n" "🇹🇿  YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL POWER  🇹🇿"
+printf "║ %-76s ║\n" "Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
+echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+echo ""
+
+echo "Version: YutubuDownload v1.0 (2026-02-08)"
 echo "Repository: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal"
 echo ""
