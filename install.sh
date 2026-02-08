@@ -206,9 +206,10 @@ echo "║                                                                       
 echo "║ 🌍 Made with ❤️ for Tanzania by Johnbosco (Dar es Salaam)                     ║"
 echo "║                                                                              ║"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+echo ""
 
-echo"YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL POWER  "
-echo"Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
+echo "YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL POWER  "
+echo "Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
 echo ""
 
 echo "Version: YutubuDownload v1.0 (2026-02-08)"
