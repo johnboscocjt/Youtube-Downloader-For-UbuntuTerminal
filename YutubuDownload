@@ -340,23 +340,38 @@ echo " JS Runtime:   $( [[ -n "$JS_RUNTIME" ]] && echo "${JS_RUNTIME##*=}" || ec
 echo "──────────────────────────────────────────────────────────────"
 echo ""
 
-# === BEAUTIFUL PROGRESS BAR HANDLER ===
-PROGRESS_CMD="--progress"
-YT_DLP_VERSION=$(yt-dlp --version 2>/dev/null | head -n1 || echo "2021.01.01")
+# === ENHANCED PROGRESS BAR CONFIGURATION ===
+BAR_WIDTH=20
 
-# Check if modern progress template is supported (yt-dlp >= 2023.07.06)
-if printf '%s\n2023.07.06' "$YT_DLP_VERSION" | sort -V -C 2>/dev/null; then
-    # Modern yt-dlp: Use beautiful Unicode block bar
-    PROGRESS_CMD="--progress-template \$'download:Downloading: {progress_bar} {progress_pct}% [{downloaded_bytes}/{total_bytes}]\\nETA: {eta} | Speed: {speed} | Location: ${FOLDER_NAME:-Current directory}'"
-else
-    # Fallback for older versions: Enhanced standard progress
-    PROGRESS_CMD="--progress --console-title"
-    echo -e "\033[38;5;214m⚠️  Using standard progress bar (upgrade yt-dlp for Unicode blocks):\033[0m"
-    echo "   pip install -U yt-dlp"
-    echo ""
-fi
+# Colors for progress bar
+RESET="\033[0m"
+CYAN="\033[36m"
+YELLOW="\033[33m"
+MAGENTA="\033[35m"
+GREEN="\033[32m"
+BRIGHT_GREEN="\033[92m"
+BLUE="\033[34m"
+BRIGHT_BLUE="\033[94m"
 
-# === FIXED yt-dlp COMMAND WITH BEAUTIFUL PROGRESS ===
+# Cursor movement
+CSI="\033["
+HIDE_CURSOR="${CSI}?25l"
+SHOW_CURSOR="${CSI}?25h"
+CLEAR_LINE="${CSI}2K"
+GOTO_COL1="${CSI}0G"
+UP_1="${CSI}1A"
+DOWN_1="${CSI}1B"
+
+# Hide cursor and set up cleanup trap
+echo -e "$HIDE_CURSOR"
+trap 'echo -e "${SHOW_CURSOR}"; echo -e "\r${CLEAR_LINE}${GOTO_COL1}"; echo -e "${UP_1}${CLEAR_LINE}${GOTO_COL1}"; exit' INT TERM EXIT
+
+# Display location based on user choice
+DISPLAY_LOCATION="${FOLDER_NAME:-Current directory}"
+
+echo "Starting download... (progress will update in 2 fixed lines)"
+
+# === FIXED yt-dlp COMMAND WITH GREEN PROGRESS BAR ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
     if yt-dlp \
@@ -372,14 +387,76 @@ for ATTEMPT in 1 2 3; do
         --no-overwrites \
         --merge-output-format mp4 \
         $ARCHIVE_FLAG \
-        $PROGRESS_CMD \
+        --newline \
+        --no-warnings \
+        --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
+        --output-na-placeholder "-" \
         "$URL" 2>&1 | while IFS= read -r line; do
-            # Clean up yt-dlp's JSON progress artifacts (if any)
-            if [[ "$line" == *"{"* ]] && [[ "$line" == *"}"* ]] && [[ "$line" != *"error"* ]]; then
-                continue
-            fi
+        
+        # Handle metadata lines
+        if [[ "$line" =~ ^\[ ]]; then
             echo "$line"
-        done; then
+            continue
+        fi
+        
+        # Parse progress line
+        read -r downloaded total percent eta speed <<< "$line"
+        
+        if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
+            percent_int="${BASH_REMATCH[1]}"
+            if [ "$percent_int" -ge 99 ]; then
+                full_bar=$(printf '█%.0s' $(seq 1 $BAR_WIDTH))
+                percent_display="100.0%"
+                if [ "$total" -gt 0 ]; then
+                    dl_mib=$(( total / 1048576 ))
+                    tot_mib=$(( total / 1048576 ))
+                else
+                    dl_mib=0
+                    tot_mib=0
+                fi
+                # Use green status directly in printf
+                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
+                    "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+            else
+                filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+                bar=$(printf '█%.0s' $(seq 1 "$filled"))
+                empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+                full_bar="$bar$empty"
+                percent_display="$percent"
+                if [ "$total" -gt 0 ]; then
+                    dl_mib=$(( downloaded / 1048576 ))
+                    tot_mib=$(( total / 1048576 ))
+                else
+                    dl_mib=0
+                    tot_mib=0
+                fi
+                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
+                    "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+            fi
+            
+            # Second line with ETA, Speed, and Location
+            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
+                "$eta" "$speed" "$DISPLAY_LOCATION"
+            
+            sleep 0.3
+        fi
+        
+        # Post-processing detection
+        if [[ "$line" =~ \[ExtractAudio\] || "$line" =~ Destination:.*\.mp3 ]] || [[ "$line" =~ \[Merger\] ]]; then
+            printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+            if [[ "$IS_MP3" == "true" ]]; then
+                printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - converting to MP3..."
+            else
+                printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - merging audio/video..."
+            fi
+            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "Post-processing in progress... please wait"
+        fi
+        
+    done; then
         DOWNLOAD_SUCCESS=true
         break
     else
@@ -398,6 +475,9 @@ for ATTEMPT in 1 2 3; do
         fi
     fi
 done
+
+# Show cursor again
+echo -e "${SHOW_CURSOR}"
 
 if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     echo ""
