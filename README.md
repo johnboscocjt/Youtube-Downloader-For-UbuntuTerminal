@@ -153,6 +153,8 @@ sudo chmod +x /usr/local/bin/YutubuDownload
 
 ### **5. Completion & File Organization**
 ![Completion Screen](Screenshots/5.png)
+![Completion Screen](Screenshots/6.png)
+![Completion Screen](Screenshots/7.png)
 
 </div>
 
