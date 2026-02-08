@@ -210,27 +210,16 @@ echo "║                                                                       
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
 
-# === PERFECT ANIMATED TANZANIAN FLAG (WITH COLORS + CLEAN BORDER) ===
+# === COLORED TANZANIAN FLAG (NO ANIMATION, PERFECT BORDER) ===
 echo "╔══════════════════════════════════════════════════════════════════════════════╗"
 echo "║                                                                              ║"
-
-# Animate each line with correct ANSI colors and exact 78-char width
-sleep 0.2
-echo -e "║\033[48;5;46m\033[38;5;46m$(printf '%78s' '')\033[0m║"
-sleep 0.15
-echo -e "║\033[48;5;46m\033[38;5;46m$(printf '%78s' '')\033[0m║"
-sleep 0.15
-echo -e "║\033[48;5;220m\033[38;5;220m$(printf '%78s' '')\033[0m║"
-sleep 0.1
-echo -e "║\033[48;5;0m\033[38;5;0m$(printf '%78s' '')\033[0m║"
-sleep 0.1
-echo -e "║\033[48;5;220m\033[38;5;220m$(printf '%78s' '')\033[0m║"
-sleep 0.15
-echo -e "║\033[48;5;39m\033[38;5;39m$(printf '%78s' '')\033[0m║"
-sleep 0.15
-echo -e "║\033[48;5;39m\033[38;5;39m$(printf '%78s' '')\033[0m║"
-sleep 0.2
-
+echo -e "║\033[48;5;46m${RESET}\033[0m║"
+echo -e "║\033[48;5;46m${RESET}\033[0m║"
+echo -e "║\033[48;5;220m${RESET}\033[0m║"
+echo -e "║\033[48;5;0m${RESET}\033[0m║"
+echo -e "║\033[48;5;220m${RESET}\033[0m║"
+echo -e "║\033[48;5;39m${RESET}\033[0m║"
+echo -e "║\033[48;5;39m${RESET}\033[0m║"
 echo "║                                                                              ║"
 printf "║ %-76s ║\n" "🇹🇿  YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL POWER  🇹🇿"
 printf "║ %-76s ║\n" "Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
