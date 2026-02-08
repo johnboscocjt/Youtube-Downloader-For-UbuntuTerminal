@@ -5,93 +5,6 @@
 
 set -euo pipefail
 
-# === PROGRESS BAR FUNCTIONS ===
-show_progress_bar() {
-    local percent="$1"
-    local size=40
-    
-    # Calculate filled and empty parts
-    local filled=$((percent * size / 100))
-    local empty=$((size - filled))
-    
-    # Create progress bar
-    local bar="["
-    for ((i=0; i<filled; i++)); do bar+="█"; done
-    for ((i=0; i<empty; i++)); do bar+="░"; done
-    bar+="]"
-    
-    # Format with colors
-    if [ $percent -lt 30 ]; then
-        echo -ne "\033[38;5;196m"
-    elif [ $percent -lt 70 ]; then
-        echo -ne "\033[38;5;214m"
-    else
-        echo -ne "\033[38;5;46m"
-    fi
-    
-    printf "Downloading: %s %3d%%" "$bar" "$percent"
-    
-    # Show MB if we have the info
-    if [ $# -ge 3 ]; then
-        local current_mb="$2"
-        local total_mb="$3"
-        printf " [%.1fMB/%.1fMB]" "$current_mb" "$total_mb"
-    fi
-    
-    # Show ETA if available
-    if [ $# -ge 4 ] && [ -n "$4" ] && [ "$4" != "00:00" ] && [ "$4" != "NA" ]; then
-        local eta="$4"
-        printf " | ETA: %s" "$eta"
-    fi
-    
-    # Show speed if available
-    if [ $# -ge 5 ] && [ -n "$5" ]; then
-        local speed="$5"
-        printf " | Speed: %s" "$speed"
-    fi
-    
-    echo -ne "\033[K\r"
-}
-
-# Function to parse yt-dlp progress line
-parse_ytdlp_progress() {
-    local line="$1"
-    
-    # Match pattern: 66.0%|2.93MiB|497.70KiB/s|00:02
-    if [[ "$line" =~ ([0-9.]+)%\ *\|\ *([0-9.]+)([KMG]iB)\ *\|\ *([0-9.]+)([KMG]iB/s)\ *\|\ *([0-9:]+|NA) ]]; then
-        local percent="${BASH_REMATCH[1]}"
-        local total_size="${BASH_REMATCH[2]}"
-        local total_unit="${BASH_REMATCH[3]}"
-        local speed="${BASH_REMATCH[4]}"
-        local speed_unit="${BASH_REMATCH[5]}"
-        local eta="${BASH_REMATCH[6]}"
-        
-        # Convert total to MB
-        local total_mb=0
-        case "$total_unit" in
-            "KiB") total_mb=$(echo "$total_size / 1024" | bc -l 2>/dev/null || echo "0") ;;
-            "MiB") total_mb="$total_size" ;;
-            "GiB") total_mb=$(echo "$total_size * 1024" | bc -l 2>/dev/null || echo "0") ;;
-        esac
-        
-        # Calculate current MB
-        local current_mb=$(echo "$total_mb * $percent / 100" | bc -l 2>/dev/null || echo "0")
-        
-        # Convert speed to MB/s
-        local speed_mb=""
-        case "$speed_unit" in
-            "KiB/s") speed_mb=$(echo "scale=2; $speed / 1024" | bc 2>/dev/null || echo "0") ;;
-            "MiB/s") speed_mb="$speed" ;;
-            "GiB/s") speed_mb=$(echo "$speed * 1024" | bc 2>/dev/null || echo "0") ;;
-        esac
-        
-        echo "$percent|$current_mb|$total_mb|$eta|${speed_mb}MB/s"
-        return 0
-    fi
-    
-    return 1
-}
-
 # === ANIMATED FEEDBACK FUNCTIONS ===
 print_loading() {
     local msg="$1"
@@ -335,7 +248,6 @@ echo ""
 # Folder organization
 FOLDER_NAME=""
 USE_FOLDER="false"
-SAVE_LOCATION=""
 
 if [[ "$IS_PLAYLIST" == "true" ]]; then
     echo "📁 Create dedicated folder for playlist? (HIGHLY RECOMMENDED)"
@@ -352,10 +264,8 @@ if [[ "$IS_PLAYLIST" == "true" ]]; then
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
         FOLDER_NAME="${FOLDER_NAME:-%(playlist_title)s [%(playlist_id)s]}"
         OUTPUT_TEMPLATE="${FOLDER_NAME}/%(playlist_index)02d - %(title)s.%(ext)s"
-        SAVE_LOCATION="~/$(echo "$FOLDER_NAME" | sed 's/%([^)]*)//g' | xargs)"
     else
         OUTPUT_TEMPLATE="%(playlist_index)02d - %(title)s.%(ext)s"
-        SAVE_LOCATION="~/"
     fi
 else
     echo -n "📁 Save in custom folder? (y/n) [default=n]: "
@@ -370,9 +280,6 @@ else
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
         FOLDER_NAME="${FOLDER_NAME:-Downloads}"
         OUTPUT_TEMPLATE="${FOLDER_NAME}/%(title)s.%(ext)s"
-        SAVE_LOCATION="~/$FOLDER_NAME"
-    else
-        SAVE_LOCATION="~/"
     fi
 fi
 echo ""
@@ -428,23 +335,15 @@ echo "────────────────────────�
 echo " URL:          $URL"
 echo " Type:         $( [[ "$IS_PLAYLIST" == "true" ]] && echo "Playlist (ALL videos)" || echo "Single Video ONLY" )"
 echo " Format:       $( [[ "$IS_MP3" == "true" ]] && echo "MP3 ($AUDIO_QUAL)" || echo "Video (max ${MAX_HEIGHT}p) WITH AUDIO" )"
-echo " Destination:  $SAVE_LOCATION"
+echo " Destination:  $( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
 echo " JS Runtime:   $( [[ -n "$JS_RUNTIME" ]] && echo "${JS_RUNTIME##*=}" || echo "None" )"
 echo "──────────────────────────────────────────────────────────────"
 echo ""
 
-# Show location
-echo -e "\033[38;5;39mLocation: $SAVE_LOCATION\033[0m"
-echo ""
-
-# === SIMPLE DOWNLOAD WITH VISUAL PROGRESS ===
+# === FIXED yt-dlp COMMAND (WITH ANIMATED RETRIES) ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
-    # Create a temporary file for yt-dlp output
-    TEMP_OUTPUT=$(mktemp)
-    
-    # Start yt-dlp and capture output
-    yt-dlp \
+    if yt-dlp \
         $PLAYLIST_FLAG \
         $MP3_FLAGS \
         -f "$FORMAT" \
@@ -458,62 +357,8 @@ for ATTEMPT in 1 2 3; do
         --merge-output-format mp4 \
         $ARCHIVE_FLAG \
         --progress \
-        --newline \
-        "$URL" > "$TEMP_OUTPUT" 2>&1 &
-    
-    DOWNLOAD_PID=$!
-    
-    # Variables for progress
-    LAST_PERCENT=0
-    LAST_UPDATE=$(date +%s)
-    
-    # Monitor progress
-    while kill -0 $DOWNLOAD_PID 2>/dev/null 2>&1; do
-        # Check if we have new progress data
-        if [ -s "$TEMP_OUTPUT" ]; then
-            # Get the latest progress line
-            LAST_LINE=$(tail -n 5 "$TEMP_OUTPUT" | grep -E '[0-9.]+%[[:space:]]+\|[[:space:]]+[0-9.]+[KMG]iB[[:space:]]+\|[[:space:]]+[0-9.]+[KMG]iB/s[[:space:]]+\|[[:space:]]+[0-9:]+|NA' | tail -n 1)
-            
-            if [ -n "$LAST_LINE" ]; then
-                # Parse the progress line
-                if parse_ytdlp_progress "$LAST_LINE"; then
-                    IFS='|' read -r percent current_mb total_mb eta speed <<< "$(parse_ytdlp_progress "$LAST_LINE")"
-                    
-                    # Only update if percentage changed or 1 second passed
-                    CURRENT_TIME=$(date +%s)
-                    if [[ "$percent" != "$LAST_PERCENT" ]] || [[ $((CURRENT_TIME - LAST_UPDATE)) -ge 1 ]]; then
-                        # Show our custom progress bar
-                        show_progress_bar "$(printf "%.0f" "$percent")" "$current_mb" "$total_mb" "$eta" "$speed"
-                        
-                        # Update last values
-                        LAST_PERCENT="$percent"
-                        LAST_UPDATE="$CURRENT_TIME"
-                    fi
-                fi
-            fi
-        fi
-        
-        sleep 0.5
-    done
-    
-    # Clean up
-    wait $DOWNLOAD_PID
-    DOWNLOAD_EXIT_CODE=$?
-    
-    # Clear the progress line
-    echo -ne "\033[K\n"
-    
-    # Show final output (excluding progress lines)
-    if [ -s "$TEMP_OUTPUT" ]; then
-        grep -vE '[0-9.]+%[[:space:]]+\|[[:space:]]+[0-9.]+[KMG]iB[[:space:]]+\|[[:space:]]+[0-9.]+[KMG]iB/s[[:space:]]+\|[[:space:]]+[0-9:]+|NA' "$TEMP_OUTPUT" || true
-    fi
-    
-    rm -f "$TEMP_OUTPUT"
-    
-    # Check if download succeeded
-    if [ $DOWNLOAD_EXIT_CODE -eq 0 ]; then
+        "$URL" 2>&1; then
         DOWNLOAD_SUCCESS=true
-        echo -e "\033[38;5;46m✅ Download complete!\033[0m"
         break
     else
         echo ""
@@ -546,17 +391,18 @@ echo "╔═══════════════════════�
 echo "║                                                                              ║"
 printf "║ ✅ DOWNLOAD COMPLETE at %-52s ║\n" "$(date '+%I:%M:%S %p')"
 echo "║                                                                              ║"
-printf "║ Files saved: %-63s ║\n" "$SAVE_LOCATION"
+printf "║ Files saved: %-63s ║\n" "$( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
 printf "║ • Mode: %-68s ║\n" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "FULL PLAYLIST" || echo "SINGLE VIDEO ONLY" )"
 printf "║ • Audio: GUARANTEED (MP4 merge format)                                       ║\n"
 printf "║ • Quality: Standard resolutions (360p-4K) always available                   ║\n"
 echo "║                                                                              ║"
 echo "║    💡 TANZANIA TIPS:                                                         ║"
 printf "║ • Single video? Script IGNORES ?list= params                                 ║\n"
-printf "║ • Audio missing? Re-download at 720p (most reliable streams)                 ║"
-echo "║ • Bot errors? Script auto-refreshes cookies                                  ║"
-echo "║ • Slow network? 720p works 95% of time on Vodacom/Airtel                     ║"
+printf "║ • Audio missing? Re-download at 720p (most reliable streams)                 ║\n"
+printf "║ • Bot errors? Script auto-refreshes cookies                                  ║\n"
+printf "║ • Slow network? 720p works 95% of time on Vodacom/Airtel                       ║\n"
 echo "║                                                                              ║"
+# Hand-padded for 2-character wide emojis
 printf "║ Enjoy your downloads! 🌍✨                                                   ║\n"
 printf "║ Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)                       ║\n"
 echo "║                                                                              ║"
@@ -574,6 +420,7 @@ cat << 'EOF'
          ¸¸·''                                                           ¸ ·  ˜¸  ˜
         ¸˜¨  ¸¸˜                                                    ¸.·˜¸ ·˜
        ¸'     ˜·¸                                         ¸,..--·.¸
+
       ¸'¸¸¸      ˜-.¸                                 ¸,..---···-¸˜¨¸
     ·˜¸¸¸¸¸¸¯¯˜·.¸      .¸·˜                 ¸,-·˜;;;;;;;;;;;;¸'˜
        ¸·˜ ;;;;;;,˜·¸   ˜¸      ˜.¸          ¸.˜;;;;;;;;;;;;;;;;¸'
@@ -584,7 +431,7 @@ cat << 'EOF'
               ˜·¸   ·¨¸¸,,,.˜ .,¸                               ¸,.·˜¨
                   ˜¨¸           ¯˜·¸              ¸.···˜˜·¸.·˜¨¸/
                      ˜·¸¸¸,,,,¸¸¸¸   ˜¸         ¸·˜   ¸.·˜,˜ ¸·˜¨
-                        ¸¨˜˜˜'˜¨¨¯'   ˜¸       ˜¸,.·˜¸;     \¸
+                        ¨¸¨˜˜˜'˜¨¨¯'   ˜¸       ˜¸,.·˜¸;     \¸
                           ˜¸            ˜¸.   ¸·˜;;;˜         '¸
                            ˜¸¸          ¸,.-·¨¸;;;              '¸
                           ¸,·´¯¨˜˜˜¨¯¯;;;;;;;˜                 ˜.,¸¸¸
