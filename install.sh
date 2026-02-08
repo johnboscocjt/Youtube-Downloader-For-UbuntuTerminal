@@ -109,34 +109,61 @@ else
     fi
 fi
 
-# STEP 3: Deno
+# STEP 3: Deno (FIXED VERSION)
 echo ""
 echo "📦 STEP 3/5: Checking Deno (JavaScript runtime)..."
 if command -v deno &> /dev/null; then
     echo "   ✅ Deno already installed ($(deno --version | head -1 | awk '{print $2}'))"
 else
-    print_loading "   ⬇️  Installing Deno"
-    curl -fsSL https://deno.land/install.sh | sh -s v1.x > /tmp/deno-install.log 2>&1
+    print_loading "   ⬇️  Installing Deno system-wide"
+    
+    # Download and install Deno to /usr/local
+    curl -fsSL https://deno.land/x/install/install.sh | DENO_INSTALL=/usr/local sh > /dev/null 2>&1
+    
+    # Check if installation was successful
     if command -v deno &> /dev/null; then
-        echo "   ✅ Deno installed"
+        echo "   ✅ Deno installed system-wide"
     else
-        echo "   ⚠️  Deno installation failed (non-critical). YouTube may block high-quality downloads."
-        echo "      To fix later: curl -fsSL https://deno.land/install.sh | sh"
+        # Alternative installation method
+        echo "   ⬇️  Trying alternative Deno installation method..."
+        curl -fsSL https://deno.land/install.sh | sh -s v1.x > /dev/null 2>&1
+        if [ -f "/root/.deno/bin/deno" ]; then
+            # Add to PATH for current session
+            export PATH="/root/.deno/bin:$PATH"
+            # Add to root's .bashrc for future sessions
+            echo 'export DENO_INSTALL="/root/.deno"' >> /root/.bashrc
+            echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> /root/.bashrc
+            echo "   ✅ Deno installed to /root/.deno/bin"
+        else
+            echo "   ⚠️  Deno installation failed (non-critical). YouTube may block high-quality downloads."
+            echo "      To fix later: curl -fsSL https://deno.land/x/install/install.sh | DENO_INSTALL=/usr/local sh"
+        fi
     fi
 fi
 
-# Add Deno to PATH permanently (for current user)
+# Add Deno to PATH for regular user if needed
 CURRENT_USER="${SUDO_USER:-$USER}"
-if [ -n "$CURRENT_USER" ] && id "$CURRENT_USER" &>/dev/null; then
+if [ -n "$CURRENT_USER" ] && [ "$CURRENT_USER" != "root" ] && id "$CURRENT_USER" &>/dev/null; then
     USER_HOME=$(eval echo "~$CURRENT_USER")
-    for rcfile in "$USER_HOME/.bashrc" "$USER_HOME/.zshrc"; do
-        if [ -f "$rcfile" ]; then
-            if ! grep -q 'export PATH="$HOME/.deno/bin:$PATH"' "$rcfile" 2>/dev/null; then
-                echo 'export PATH="$HOME/.deno/bin:$PATH"' >> "$rcfile"
-                chown "$CURRENT_USER:$CURRENT_USER" "$rcfile" 2>/dev/null
-            fi
+    
+    # Check if user already has Deno in PATH
+    if sudo -u "$CURRENT_USER" bash -c 'command -v deno' &>/dev/null; then
+        echo "   ✅ Deno already in PATH for user $CURRENT_USER"
+    else
+        # Check if user has Deno installed
+        if [ -f "$USER_HOME/.deno/bin/deno" ]; then
+            # Add to user's shell config
+            for rcfile in "$USER_HOME/.bashrc" "$USER_HOME/.zshrc"; do
+                if [ -f "$rcfile" ]; then
+                    if ! grep -q 'export PATH="$HOME/.deno/bin:$PATH"' "$rcfile" 2>/dev/null; then
+                        echo 'export PATH="$HOME/.deno/bin:$PATH"' | sudo -u "$CURRENT_USER" tee -a "$rcfile" > /dev/null
+                        chown "$CURRENT_USER:$CURRENT_USER" "$rcfile" 2>/dev/null
+                    fi
+                fi
+            done
+            echo "   ✅ Added Deno to PATH for user $CURRENT_USER"
         fi
-    done
+    fi
 fi
 
 # STEP 4: Python venv for cookies
