@@ -2,23 +2,22 @@
 # 🎥 YutubuDownload  
 ### *Tanzania-Optimized YouTube Downloader for Ubuntu Terminal*  
 
+> “Out here doing some Alien things, Jesus is King...” — Johnbosco (Isaiah 28:21)
+
 <div align="center">
 
 ```
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
-║   Y   Y  U   U  TTTTT  U   U  B   B  U   U     DDDD   OOO   W   W  N   N    ║
-║    Y Y   U   U    T    U   U  B   B  U   U     D   D O   O  W   W  NN  N    ║
-║     Y    U   U    T    U   U  BBBB   U   U     D   D O   O  W W W  N N N    ║
-║     Y    U   U    T    U   U  B   B  U   U     D   D O   O  WW WW  N  NN    ║
-║     Y     UUU     T     UUU   BBBBB   UUU      DDDD   OOO   W   W  N   N    ║
-║                                                                              ║
-║          v1.0 • Fast • Reliable • Bot-Bypass • Resume Support                ║
-║                Designed for Tanzania's Internet Conditions                   ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+█████ █████             █████               █████                ██████████                                       ████                         █████
+░░███ ░░███             ░░███               ░░███                ░░███░░░░███                                     ░░███                        ░░███ 
+ ░░███ ███   █████ ████ ███████   █████ ████ ░███████  █████ ████ ░███   ░░███  ██████  █████ ███ █████ ████████   ░███   ██████   ██████    ███████ 
+  ░░█████   ░░███ ░███ ░░░███░   ░░███ ░███  ░███░░███░░███ ░███  ░███    ░███ ███░░███░░███ ░███░░███ ░░███░░███  ░███  ███░░███ ░░░░░███  ███░░███ 
+   ░░███     ░███ ░███   ░███     ░███ ░███  ░███ ░███ ░███ ░███  ░███    ░███░███ ░███ ░███ ░███ ░███  ░███ ░███  ░███ ░███ ░███  ███████ ░███ ░███ 
+    ░███     ░███ ░███   ░███ ███ ░███ ░███  ░███ ░███ ░███ ░███  ░███    ███ ░███ ░███ ░░███████████   ░███ ░███  ░███ ░███ ░███ ███░░███ ░███ ░███ 
+    █████    ░░████████  ░░█████  ░░████████ ████████  ░░████████ ██████████  ░░██████   ░░████░████    ████ █████ █████░░██████ ░░████████░░████████
+   ░░░░░      ░░░░░░░░    ░░░░░    ░░░░░░░░ ░░░░░░░░    ░░░░░░░░ ░░░░░░░░░░    ░░░░░░     ░░░░ ░░░░    ░░░░ ░░░░░ ░░░░░  ░░░░░░   ░░░░░░░░  ░░░░░░░░ 
 ```
 
-**Author:** Johnbosco | **Last Updated:** February 06, 2026  
+**Author:** Johnbosco | **Last Updated:** February 08, 2026  
 🌍 *Tested across Dar es Salaam, Mwanza, Arusha & Zanzibar networks*  
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal)  
@@ -31,6 +30,17 @@
 
 ---
 
+## 🌌 Alien-Tech Terminal Experience
+
+YutubuDownload now features a **cyberpunk-inspired terminal interface** with:
+- 🔵 **Animated green loading pulses** for smooth feedback
+- 🔴 **Flashing red alerts** for critical errors
+- 🟢 **Hacker-green ASCII art** + **Swahili-tech block headers**
+- ✨ **Faith-powered closing flourish** with cosmic wave animation
+
+Your terminal doesn’t just download — it **declares Kingdom authority over the digital realm**.
+
+---
 
 ## ⚡ One-Command Installation (Recommended)
 
@@ -39,6 +49,7 @@
 sudo bash -c "$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)"
 ```
 
+---
 
 ## 🚀 Quick Start
 
@@ -74,7 +85,7 @@ YutubuDownload
   Video (any resolution) or MP3 (320kbps/192kbps/128kbps)
   
 - **💾 Data-Saving**  
-  Never re-downloads completed videos (tracked in `~/yt-downloads-archive.txt`)
+  Never re-downloads completed videos are tracked 
   
 - **⚡ Deno-Powered**  
   Solves YouTube's 2026 JavaScript challenges for full quality access
@@ -97,6 +108,7 @@ python3 -m venv yt-venv && source yt-venv/bin/activate && pip install secretstor
 sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload && sudo chmod +x /usr/local/bin/YutubuDownload
 ```
 
+---
 
 ## 📚 Full Documentation
 
@@ -105,25 +117,13 @@ For detailed setup, troubleshooting, and advanced usage:
 
 ---
 
----
-
-### 🔧 How to Update from Terminal
-
-After replacing the file on GitHub, update your local copy with:
-```bash
-sudo curl -sL "https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload?$(date +%s)" -o /usr/local/bin/YutubuDownload && sudo chmod +x /usr/local/bin/YutubuDownload
-```
-## OR: without cache bypassing
+## 🔁 How to Update
 
 ```bash
 # Fetch latest version
 sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload
-
-# Make sure it's executable
 sudo chmod +x /usr/local/bin/YutubuDownload
 ```
-
-
 
 ---
 
@@ -154,4 +154,7 @@ sudo chmod +x /usr/local/bin/YutubuDownload
 — Johnbosco, Dar es Salaam 🇹🇿  
 
 </div>
+
+
+
 
