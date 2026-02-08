@@ -120,6 +120,14 @@ For detailed setup, troubleshooting, and advanced usage:
 ## 🔁 How to Update
 
 ```bash
+#One command
+sudo bash -c "$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)"
+sudo chmod +x /usr/local/bin/YutubuDownload
+
+```
+
+## OR:
+```bash
 # Fetch latest version
 sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload
 sudo chmod +x /usr/local/bin/YutubuDownload
