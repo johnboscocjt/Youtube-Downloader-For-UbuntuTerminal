@@ -54,33 +54,52 @@ show_progress_bar() {
         printf " | Speed: %s" "$speed"
     fi
     
-    echo -ne "\r"
+    echo -ne "\033[K\r"
 }
 
-# Function to format bytes to human readable
-format_bytes() {
-    local bytes="$1"
-    if (( bytes >= 1073741824 )); then
-        echo "$(echo "scale=1; $bytes/1073741824" | bc)GB/s"
-    elif (( bytes >= 1048576 )); then
-        echo "$(echo "scale=1; $bytes/1048576" | bc)MB/s"
-    elif (( bytes >= 1024 )); then
-        echo "$(echo "scale=1; $bytes/1024" | bc)KB/s"
-    else
-        echo "${bytes}B/s"
+# Function to parse yt-dlp progress line
+parse_progress_line() {
+    local line="$1"
+    
+    # Match pattern: 66.0%|13.47MiB|780.65KiB/s|00:06
+    if [[ "$line" =~ ([0-9.]+)%\|([0-9.]+)([KMG]iB)\|([0-9.]+)([KMG]iB/s)\|([0-9:]+) ]]; then
+        local percent="${BASH_REMATCH[1]}"
+        local total_size="${BASH_REMATCH[2]}"
+        local total_unit="${BASH_REMATCH[3]}"
+        local speed="${BASH_REMATCH[4]}"
+        local speed_unit="${BASH_REMATCH[5]}"
+        local eta="${BASH_REMATCH[6]}"
+        
+        # Convert total to MB
+        local total_mb=0
+        case "$total_unit" in
+            "KiB") total_mb=$(echo "$total_size / 1024" | bc -l 2>/dev/null || echo "0") ;;
+            "MiB") total_mb="$total_size" ;;
+            "GiB") total_mb=$(echo "$total_size * 1024" | bc -l 2>/dev/null || echo "0") ;;
+        esac
+        
+        # Calculate current MB
+        local current_mb=$(echo "$total_mb * $percent / 100" | bc -l 2>/dev/null || echo "0")
+        
+        # Convert speed to MB/s
+        local speed_mb=""
+        case "$speed_unit" in
+            "KiB/s") speed_mb=$(echo "scale=2; $speed / 1024" | bc 2>/dev/null || echo "0") ;;
+            "MiB/s") speed_mb="$speed" ;;
+            "GiB/s") speed_mb=$(echo "$speed * 1024" | bc 2>/dev/null || echo "0") ;;
+        esac
+        
+        # Convert ETA to seconds
+        local eta_seconds=0
+        if [[ "$eta" =~ ([0-9]+):([0-9]+) ]]; then
+            eta_seconds=$(( ${BASH_REMATCH[1]} * 60 + ${BASH_REMATCH[2]} ))
+        fi
+        
+        echo "$percent|$current_mb|$total_mb|$eta_seconds|${speed_mb}MB/s"
+        return 0
     fi
-}
-
-# Function to format seconds to MM:SS
-format_seconds() {
-    local seconds="$1"
-    if [ -z "$seconds" ] || [ "$seconds" = "0" ]; then
-        echo "00:00"
-    else
-        local mins=$((seconds / 60))
-        local secs=$((seconds % 60))
-        printf "%02d:%02d" "$mins" "$secs"
-    fi
+    
+    return 1
 }
 
 # === ANIMATED FEEDBACK FUNCTIONS ===
@@ -424,14 +443,17 @@ echo " JS Runtime:   $( [[ -n "$JS_RUNTIME" ]] && echo "${JS_RUNTIME##*=}" || ec
 echo "──────────────────────────────────────────────────────────────"
 echo ""
 
+# Show location
+echo -e "\033[38;5;39mLocation: $SAVE_LOCATION\033[0m"
+echo ""
+
 # === FANCY DOWNLOAD WITH PROGRESS BAR ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
-    # Create a named pipe to capture progress
-    PIPE=$(mktemp -u)
-    mkfifo "$PIPE"
+    # Create a temporary file for yt-dlp output
+    TEMP_OUTPUT=$(mktemp)
     
-    # Start download in background
+    # Start yt-dlp with no progress and capture output
     yt-dlp \
         $PLAYLIST_FLAG \
         $MP3_FLAGS \
@@ -445,8 +467,11 @@ for ATTEMPT in 1 2 3; do
         --no-overwrites \
         --merge-output-format mp4 \
         $ARCHIVE_FLAG \
+        --newline \
+        --progress \
         --progress-template "%(progress._percent_str)s|%(progress._total_bytes_str)s|%(progress._speed_str)s|%(progress._eta_str)s" \
-        "$URL" 2>&1 | tee "$PIPE" &
+        --no-simulate \
+        "$URL" 2>&1 | tee "$TEMP_OUTPUT" &
     
     DOWNLOAD_PID=$!
     
@@ -456,70 +481,25 @@ for ATTEMPT in 1 2 3; do
     CURRENT_MB=0
     SPEED="0B/s"
     ETA="00:00"
-    LAST_LINE=""
-    
-    # Show initial location
-    echo -e "\033[38;5;39mLocation: $SAVE_LOCATION\033[0m"
-    echo ""
     
     # Monitor progress
-    while kill -0 $DOWNLOAD_PID 2>/dev/null; do
-        # Read all available lines
-        while IFS= read -r line; do
-            if [[ -n "$line" ]]; then
-                LAST_LINE="$line"
-            fi
-        done < "$PIPE" 2>/dev/null || true
+    while kill -0 $DOWNLOAD_PID 2>/dev/null 2>&1; do
+        # Read the last line that contains progress info
+        LAST_PROGRESS_LINE=$(tail -n 50 "$TEMP_OUTPUT" | grep -E '[0-9.]+%\|[0-9.]+[KMG]iB\|[0-9.]+[KMG]iB/s\|[0-9:]+' | tail -n 1)
         
-        # Parse progress if line contains progress info
-        if [[ "$LAST_LINE" =~ ([0-9.]+)%\|([0-9.]+[KMG]?iB)\|([0-9.]+[KMG]?iB/s)\|([0-9:]+) ]]; then
-            PERCENTAGE="${BASH_REMATCH[1]}"
-            TOTAL_STR="${BASH_REMATCH[2]}"
-            SPEED_STR="${BASH_REMATCH[3]}"
-            ETA_STR="${BASH_REMATCH[4]}"
-            
-            # Convert total to MB
-            if [[ "$TOTAL_STR" =~ ([0-9.]+)GiB ]]; then
-                TOTAL_MB=$(echo "${BASH_REMATCH[1]} * 1024" | bc -l 2>/dev/null || echo "0")
-            elif [[ "$TOTAL_STR" =~ ([0-9.]+)MiB ]]; then
-                TOTAL_MB="${BASH_REMATCH[1]}"
-            elif [[ "$TOTAL_STR" =~ ([0-9.]+)KiB ]]; then
-                TOTAL_MB=$(echo "${BASH_REMATCH[1]} / 1024" | bc -l 2>/dev/null || echo "0")
+        if [ -n "$LAST_PROGRESS_LINE" ]; then
+            # Parse the progress line
+            if parse_progress_line "$LAST_PROGRESS_LINE"; then
+                IFS='|' read -r percent current_mb total_mb eta_seconds speed <<< "$(parse_progress_line "$LAST_PROGRESS_LINE")"
+                
+                # Update variables
+                PERCENTAGE="$percent"
+                CURRENT_MB="$current_mb"
+                TOTAL_MB="$total_mb"
+                
+                # Show progress bar
+                show_progress_bar "$(printf "%.0f" "$percent")" "100" "$current_mb" "$total_mb" "$eta_seconds" "$speed"
             fi
-            
-            # Calculate current MB
-            CURRENT_MB=$(echo "$TOTAL_MB * $PERCENTAGE / 100" | bc -l 2>/dev/null || echo "0")
-            
-            # Format speed nicely
-            if [[ "$SPEED_STR" =~ ([0-9.]+)GiB/s ]]; then
-                SPEED_VALUE=$(echo "${BASH_REMATCH[1]} * 1024" | bc -l 2>/dev/null || echo "0")
-                SPEED="${SPEED_VALUE}MB/s"
-            elif [[ "$SPEED_STR" =~ ([0-9.]+)MiB/s ]]; then
-                SPEED="${BASH_REMATCH[1]}MB/s"
-            elif [[ "$SPEED_STR" =~ ([0-9.]+)KiB/s ]]; then
-                SPEED_VALUE=$(echo "${BASH_REMATCH[1]} / 1024" | bc -l 2>/dev/null || echo "0")
-                SPEED="${SPEED_VALUE}MB/s"
-            else
-                SPEED="$SPEED_STR"
-            fi
-            
-            # Convert ETA to seconds if needed
-            if [[ "$ETA_STR" =~ ([0-9]+):([0-9]+) ]]; then
-                ETA_MINUTES="${BASH_REMATCH[1]}"
-                ETA_SECONDS="${BASH_REMATCH[2]}"
-                ETA_TOTAL_SECONDS=$((ETA_MINUTES * 60 + ETA_SECONDS))
-                ETA="$ETA_STR"
-            else
-                ETA_TOTAL_SECONDS=0
-                ETA="00:00"
-            fi
-            
-            # Show progress bar with all info
-            show_progress_bar "$(printf "%.0f" "$PERCENTAGE")" "100" "$CURRENT_MB" "$TOTAL_MB" "$ETA_TOTAL_SECONDS" "$SPEED"
-        elif [[ "$LAST_LINE" =~ ([0-9.]+)% ]]; then
-            # Fallback if we only have percentage
-            PERCENTAGE="${BASH_REMATCH[1]}"
-            show_progress_bar "$(printf "%.0f" "$PERCENTAGE")" "100"
         fi
         
         sleep 0.5
@@ -528,10 +508,10 @@ for ATTEMPT in 1 2 3; do
     # Clean up
     wait $DOWNLOAD_PID
     DOWNLOAD_EXIT_CODE=$?
-    rm -f "$PIPE"
+    rm -f "$TEMP_OUTPUT"
     
     # Clear the progress line
-    echo -ne "\033[K"
+    echo -ne "\033[K\n"
     
     # Check if download succeeded
     if [ $DOWNLOAD_EXIT_CODE -eq 0 ]; then
@@ -576,11 +556,10 @@ printf "║ • Quality: Standard resolutions (360p-4K) always available        
 echo "║                                                                              ║"
 echo "║    💡 TANZANIA TIPS:                                                         ║"
 printf "║ • Single video? Script IGNORES ?list= params                                 ║\n"
-printf "║ • Audio missing? Re-download at 720p (most reliable streams)                 ║\n"
-printf "║ • Bot errors? Script auto-refreshes cookies                                  ║\n"
-printf "║ • Slow network? 720p works 95% of time on Vodacom/Airtel                       ║\n"
+printf "║ • Audio missing? Re-download at 720p (most reliable streams)                 ║"
+echo "║ • Bot errors? Script auto-refreshes cookies                                  ║"
+echo "║ • Slow network? 720p works 95% of time on Vodacom/Airtel                     ║"
 echo "║                                                                              ║"
-# Hand-padded for 2-character wide emojis
 printf "║ Enjoy your downloads! 🌍✨                                                   ║\n"
 printf "║ Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)                       ║\n"
 echo "║                                                                              ║"
