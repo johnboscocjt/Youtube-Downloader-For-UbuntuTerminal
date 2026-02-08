@@ -430,9 +430,43 @@ for ATTEMPT in 1 2 3; do
         --output-na-placeholder "-" \
         "$URL" 2>&1 | while IFS= read -r line; do
         
-        # Handle metadata lines
+        # Handle metadata lines - Color them!
         if [[ "$line" =~ ^\[ ]]; then
-            echo "$line"
+            # Color different types of metadata lines
+            if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]]; then
+                # Playlist download start
+                echo -e "${BRIGHT_MAGENTA}$line${RESET}"
+            elif [[ "$line" =~ ^\[download\].*Downloading.*item.*of ]]; then
+                # Individual video download start
+                echo -e "${BRIGHT_CYAN}$line${RESET}"
+            elif [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
+                # URL extraction
+                echo -e "${SKY_BLUE}$line${RESET}"
+            elif [[ "$line" =~ ^\[youtube\].*Downloading.*webpage ]]; then
+                # Webpage download
+                echo -e "${CYAN}$line${RESET}"
+            elif [[ "$line" =~ ^\[youtube\].*\[jsc: ]]; then
+                # JS challenge solving
+                echo -e "${BRIGHT_GREEN}$line${RESET}"
+            elif [[ "$line" =~ ^\[info\].*Downloading.*format ]]; then
+                # Format info
+                echo -e "${LIME}$line${RESET}"
+            elif [[ "$line" =~ ^\[download\] ]]; then
+                # Generic download messages
+                echo -e "${BRIGHT_BLUE}$line${RESET}"
+            elif [[ "$line" =~ ^\[youtube\] ]]; then
+                # Generic youtube messages
+                echo -e "${BLUE}$line${RESET}"
+            elif [[ "$line" =~ ^\[ExtractAudio\] ]]; then
+                # MP3 conversion
+                echo -e "${BRIGHT_GREEN}$line${RESET}"
+            elif [[ "$line" =~ ^\[Merger\] ]]; then
+                # Audio/video merging
+                echo -e "${BRIGHT_GREEN}$line${RESET}"
+            else
+                # Other metadata
+                echo -e "${CYAN}$line${RESET}"
+            fi
             continue
         fi
         
