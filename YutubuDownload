@@ -579,7 +579,6 @@ if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
 fi
 
 
-
 # === PERFECTLY ALIGNED COMPLETION BOX ===
 echo ""
 echo -e "${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${RESET}"
@@ -587,51 +586,30 @@ echo -e "${BRIGHT_GREEN}║${RESET}                                             
 echo -e "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at $(date '+%I:%M:%S %p')                                           ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 
-# Function to count visible characters (excluding color codes)
-count_visible() {
-    echo -n "$1" | sed 's/\\033\[[0-9;]*m//g' | wc -m
-}
-
-# Files saved line
+# SIMPLE FIX: Just add the green border at the END, not in the middle
 if [[ "$USE_FOLDER" == "true" ]]; then
-    # Visible text: "Files saved: " (13) + folder_name
-    VISIBLE_TEXT="Files saved: $FOLDER_NAME"
-    VISIBLE_LEN=${#VISIBLE_TEXT}
-    NEEDED_SPACES=$((78 - VISIBLE_LEN))
-    SPACES=$(printf '%*s' $NEEDED_SPACES '')
-    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}$FOLDER_NAME${RESET}${SPACES}${BRIGHT_GREEN}║${RESET}"
+    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}$FOLDER_NAME                                                      ${BRIGHT_GREEN}║${RESET}"
 else
-    # Visible text: "Files saved: Current directory" = 30 characters
-    NEEDED_SPACES=$((78 - 30))
-    SPACES=$(printf '%*s' $NEEDED_SPACES '')
-    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}Current directory${RESET}${SPACES}${BRIGHT_GREEN}║${RESET}"
+    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}Current directory                                               ${BRIGHT_GREEN}║${RESET}"
 fi
 
-# Mode line
 if [[ "$IS_PLAYLIST" == "true" ]]; then
-    # Visible text: "• Mode: FULL PLAYLIST" = 21 characters
-    NEEDED_SPACES=$((78 - 21))
-    SPACES=$(printf '%*s' $NEEDED_SPACES '')
-    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_GREEN}FULL PLAYLIST${RESET}${SPACES}${BRIGHT_GREEN}║${RESET}"
+    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_GREEN}FULL PLAYLIST                                                          ${BRIGHT_GREEN}║${RESET}"
 else
-    # Visible text: "• Mode: SINGLE VIDEO ONLY" = 24 characters
-    NEEDED_SPACES=$((78 - 24))
-    SPACES=$(printf '%*s' $NEEDED_SPACES '')
-    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_BLUE}SINGLE VIDEO ONLY${RESET}${SPACES}${BRIGHT_GREEN}║${RESET}"
+    echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_BLUE}SINGLE VIDEO ONLY                                                       ${BRIGHT_GREEN}║${RESET}"
 fi
 
-# Rest of the box with fixed spacing
-echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
-echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED (MP4 merge format)                                            ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available                        ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-echo -e "${BRIGHT_GREEN}║${RESET}    ${BRIGHT_CYAN}💡 TANZANIA TIPS:${RESET}                                                         ${BRIGHT_GREEN}║${RESET}"
-echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Single video? Script ${BRIGHT_GREEN}IGNORES ?list= params${RESET}                                 ${BRIGHT_GREEN}║${RESET}"
-echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Audio missing? ${BRIGHT_YELLOW}Re-download at 720p${RESET} (most reliable streams)                 ${BRIGHT_GREEN}║${RESET}"
-echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Bot errors? Script ${BRIGHT_GREEN}auto-refreshes cookies${RESET}                                  ${BRIGHT_GREEN}║${RESET}"
-echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Slow network? ${BRIGHT_YELLOW}720p works 95% of time on Vodacom/Airtel${RESET}                       ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET}    ${BRIGHT_CYAN}💡 TANZANIA TIPS:                                                                     ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Single video? Script ${BRIGHT_GREEN}IGNORES ?list= params                                      ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Audio missing? ${BRIGHT_YELLOW}Re-download at 720p (most reliable streams)                      ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Bot errors? Script ${BRIGHT_GREEN}auto-refreshes cookies                                       ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Slow network? ${BRIGHT_YELLOW}720p works 95% of time on Vodacom/Airtel                          ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-echo -e "${BRIGHT_GREEN}║${RESET} ${BRIGHT_MAGENTA}Enjoy your downloads! 🌍✨${RESET}                                                   ${BRIGHT_GREEN}║${RESET}"
-echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)${RESET}                       ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${BRIGHT_MAGENTA}Enjoy your downloads! 🌍✨                                                                 ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)                                          ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${RESET}"
 echo ""
