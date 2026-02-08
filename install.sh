@@ -6,6 +6,17 @@
 # Exit on critical errors only
 set -uo pipefail
 
+# === ANIMATED LOADING FUNCTION (GREEN) ===
+print_loading() {
+    local msg="$1"
+    echo -ne "\033[38;5;46m$msg\033[0m"
+    for _ in {1..5}; do
+        echo -ne "."
+        sleep 0.3
+    done
+    echo -e " ✅\033[0m"
+}
+
 # Check root privileges
 if [[ $EUID -ne 0 ]]; then
     echo "❌ ERROR: This installer requires root privileges."
@@ -15,12 +26,17 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 echo ""
-echo "╔══════════════════════════════════════════════════════════════════════════════╗"
-echo "║                                                                              ║"
-echo "║   Y U T U B U D O W N L O A D   I N S T A L L E R   (v1.0)                   ║"
-echo "║   Tanzania-Optimized • Smart Dependency Handling • No Silent Failures        ║"
-echo "║                                                                              ║"
-echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+cat << 'EOF'
+██╗   ██╗██╗   ██╗████████╗██╗   ██╗██████╗ ██╗   ██╗██████╗  ██████╗ ██╗    ██╗███╗   ██╗██╗      ██████╗  █████╗ ██████╗ 
+╚██╗ ██╔╝██║   ██║╚══██╔══╝██║   ██║██╔══██╗██║   ██║██╔══██╗██╔═══██╗██║    ██║████╗  ██║██║     ██╔═══██╗██╔══██╗██╔══██╗
+ ╚████╔╝ ██║   ██║   ██║   ██║   ██║██████╔╝██║   ██║██║  ██║██║   ██║██║ █╗ ██║██╔██╗ ██║██║     ██║   ██║███████║██║  ██║
+  ╚██╔╝  ██║   ██║   ██║   ██║   ██║██╔══██╗██║   ██║██║  ██║██║   ██║██║███╗██║██║╚██╗██║██║     ██║   ██║██╔══██║██║  ██║
+   ██║   ╚██████╔╝   ██║   ╚██████╔╝██████╔╝╚██████╔╝██████╔╝╚██████╔╝╚███╔███╔╝██║ ╚████║███████╗╚██████╔╝██║  ██║██████╔╝
+   ╚═╝    ╚═════╝    ╚═╝    ╚═════╝ ╚═════╝  ╚═════╝ ╚═════╝  ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝ 
+                                                                                                                           
+EOF
+echo "             Y U T U B U D O W N L O A D   I N S T A L L E R                  "
+echo "                    Tanzania-Optimized • v1.0 • Feb 08, 2026                   "
 echo ""
 
 # Helper function to check if package is installed
@@ -48,13 +64,11 @@ wait_for_apt_lock() {
 echo "📦 STEP 1/5: Checking system dependencies..."
 wait_for_apt_lock
 
-# Only update apt if needed (last update > 24h ago)
 if [ ! -f /var/cache/apt/pkgcache.bin ] || [ "$(find /var/cache/apt/pkgcache.bin -mmin +1440 2>/dev/null)" ]; then
-    echo "   ↻ Updating package lists..."
+    print_loading "   ↻ Updating package lists"
     apt-get update -qq > /dev/null 2>&1 || echo "   ⚠️  Warning: apt update failed (continuing anyway)"
 fi
 
-# Install only missing packages
 MISSING_PKGS=()
 for pkg in ffmpeg python3-venv python3-pip; do
     if is_installed "$pkg"; then
@@ -84,7 +98,7 @@ echo "📦 STEP 2/5: Checking yt-dlp..."
 if command -v yt-dlp &> /dev/null && yt-dlp --version &> /dev/null; then
     echo "   ✅ yt-dlp already installed ($(yt-dlp --version | head -1))"
 else
-    echo "   ⬇️  Installing yt-dlp..."
+    print_loading "   ⬇️  Installing yt-dlp"
     curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp > /dev/null 2>&1
     chmod a+rx /usr/local/bin/yt-dlp > /dev/null 2>&1
     if command -v yt-dlp &> /dev/null; then
@@ -103,7 +117,7 @@ echo "📦 STEP 3/5: Checking Deno (JavaScript runtime)..."
 if command -v deno &> /dev/null; then
     echo "   ✅ Deno already installed ($(deno --version | head -1 | awk '{print $2}'))"
 else
-    echo "   ⬇️  Installing Deno..."
+    print_loading "   ⬇️  Installing Deno"
     curl -fsSL https://deno.land/install.sh | sh -s v1.x > /tmp/deno-install.log 2>&1
     if command -v deno &> /dev/null; then
         echo "   ✅ Deno installed"
@@ -133,13 +147,12 @@ echo "📦 STEP 4/5: Setting up Python environment for Chrome cookies..."
 USER_DIR="/home/${CURRENT_USER:-$USER}/youtubedownloading"
 ROOT_DIR="/root/youtubedownloading"
 
-# Setup root environment
 mkdir -p "$ROOT_DIR" 2>/dev/null
 cd "$ROOT_DIR"
 if [ -f "yt-venv/bin/activate" ]; then
     echo "   ✅ Root Python venv already exists"
 else
-    echo "   ⬇️  Creating root Python venv..."
+    print_loading "   ⬇️  Creating root Python venv"
     python3 -m venv yt-venv > /dev/null 2>&1
     source yt-venv/bin/activate
     pip install -q secretstorage cryptography > /dev/null 2>&1
@@ -147,14 +160,13 @@ else
     echo "   ✅ Root Python venv setup complete"
 fi
 
-# Setup user environment (if different from root)
 if [ "$CURRENT_USER" != "root" ] && [ "$CURRENT_USER" != "" ]; then
     mkdir -p "$USER_DIR" 2>/dev/null
     chown -R "$CURRENT_USER:$CURRENT_USER" "$USER_DIR" 2>/dev/null
     if sudo -u "$CURRENT_USER" test -f "$USER_DIR/yt-venv/bin/activate" 2>/dev/null; then
         echo "   ✅ User Python venv already exists"
     else
-        echo "   ⬇️  Creating user Python venv..."
+        print_loading "   ⬇️  Creating user Python venv"
         sudo -u "$CURRENT_USER" python3 -m venv "$USER_DIR/yt-venv" > /dev/null 2>&1
         sudo -u "$CURRENT_USER" bash -c "source $USER_DIR/yt-venv/bin/activate && pip install -q secretstorage cryptography > /dev/null 2>&1"
         echo "   ✅ User Python venv setup complete"
@@ -164,6 +176,7 @@ fi
 # STEP 5: YutubuDownload script
 echo ""
 echo "📦 STEP 5/5: Installing YutubuDownload script..."
+print_loading "   ⬇️  Fetching latest script"
 curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload > /dev/null 2>&1
 chmod +x /usr/local/bin/YutubuDownload > /dev/null 2>&1
 
@@ -177,45 +190,26 @@ else
     exit 1
 fi
 
-# === PERFECT 80-CHAR COMPLETION BOX (UNCHANGED) ===
+# === PERFECT 80-CHAR TANZANIAN FLAG BOX (ANIMATED) ===
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════════════════╗"
 echo "║                                                                              ║"
-printf "║ %-76s ║\n" "✅ INSTALLATION COMPLETE!"
-echo "║                                                                              ║"
-echo "║   Next steps:                                                                ║"
-printf "║ %-76s ║\n" "1. CLOSE ALL CHROME WINDOWS COMPLETELY (required for cookies)"
-printf "║ %-76s ║\n" "2. Open terminal and run:"
-printf "║ %-76s ║\n" "   cd ~/youtubedownloading && YutubuDownload"
-printf "║ %-76s ║\n" "3. Paste YouTube URL when prompted"
-echo "║                                                                              ║"
-echo "║   💡 Tanzania Tip: Run during off-peak hours (after 10 PM EAT)               ║"
-printf "║ %-76s ║\n" "   for best success on unstable networks"
-echo "║                                                                              ║"
-printf "║ %-76s ║\n" "🌍 Made with ❤️ for Tanzania by Johnbosco (Dar es Salaam)"
-echo "║                                                                              ║"
-echo "╚══════════════════════════════════════════════════════════════════════════════╝"
-echo ""
 
-# === ANIMATED TANZANIAN FLAG (OFFICIAL COLORS) ===
-echo "╔══════════════════════════════════════════════════════════════════════════════╗"
-echo "║                                                                              ║"
-
-# Animate flag line by line (Tanzania colors)
+# Animate each line with perfect width (78 chars content)
 sleep 0.2
-echo -e "\033[48;5;46m\033[38;5;46m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\033[0m"
+printf "║%-78s║\n" "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓"
 sleep 0.15
-echo -e "\033[48;5;46m\033[38;5;46m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\033[0m"
+printf "║%-78s║\n" "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓"
 sleep 0.15
-echo -e "\033[48;5;220m\033[38;5;220m█████████████████████████████████████████████████████████████████████████\033[0m"
+printf "║%-78s║\n" "█████████████████████████████████████████████████████████████████████████"
 sleep 0.1
-echo -e "\033[48;5;0m\033[38;5;0m█████████████████████████████████████████████████████████████████████████\033[0m"
+printf "║%-78s║\n" "█████████████████████████████████████████████████████████████████████████"
 sleep 0.1
-echo -e "\033[48;5;220m\033[38;5;220m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\033[0m"
+printf "║%-78s║\n" "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓"
 sleep 0.15
-echo -e "\033[48;5;39m\033[38;5;39m▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒\033[0m"
+printf "║%-78s║\n" "▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒"
 sleep 0.15
-echo -e "\033[48;5;39m\033[38;5;39m▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒\033[0m"
+printf "║%-78s║\n" "▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒"
 sleep 0.2
 
 echo "║                                                                              ║"
@@ -223,7 +217,6 @@ printf "║ %-76s ║\n" "🇹🇿  YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL 
 printf "║ %-76s ║\n" "Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
-
 echo "Version: YutubuDownload v1.0 (2026-02-08)"
 echo "Repository: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal"
 echo ""
