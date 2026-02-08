@@ -390,7 +390,7 @@ echo ""
 echo "╔══════════════════════════════════════════════════════════════════════════════╗"
 echo "║                                                                              ║"
 # Hand-padded lines for Emoji alignment (each emoji counts as 2 spaces visually)
-printf "║ ✅ DOWNLOAD COMPLETE at %-52s ║\n" "$(date '+%I:%M:%S %p')"
+printf "║ ✅ DOWNLOAD COMPLETE at %-50s ║\n" "$(date '+%I:%M:%S %p')"
 echo "║                                                                               ║"
 printf "║ Files saved: %-63s ║\n" "$( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
 printf "║ • Mode: %-68s ║\n" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "FULL PLAYLIST" || echo "SINGLE VIDEO ONLY" )"
