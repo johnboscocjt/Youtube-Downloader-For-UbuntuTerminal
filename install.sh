@@ -33,8 +33,8 @@ cat << 'EOF'
                     ▐ ▙▌▐▖▙▌▙▌▙▌▙▘▙▌▚▚▘▌▌▐▖▙▌█▌▙▌
                                                                                                                                        
 EOF
-echo "Y U T U B U D O W N L O A D   I N S T A L L E R                  "
-echo "Tanzania-Optimized • v1.0 • Feb 08, 2026                   "
+echo "        Y U T U B U D O W N L O A D   I N S T A L L E R                  "
+echo "            Tanzania-Optimized • v1.0 • Feb 08, 2026                   "
 echo ""
 
 # Helper function to check if package is installed
