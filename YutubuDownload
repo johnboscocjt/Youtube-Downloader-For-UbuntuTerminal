@@ -578,33 +578,27 @@ if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     exit 1
 fi
 
+
 # === PERFECTLY ALIGNED COMPLETION BOX ===
 echo ""
 echo -e "${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-echo -e "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at $(date '+%I:%M:%S %p')                                           ${BRIGHT_GREEN}║${RESET}"
+printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at %-52s ${BRIGHT_GREEN}║${RESET}\n" "$(date '+%I:%M:%S %p')"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 
-# Files saved line - Store colored text
+# Files saved line
 if [[ "$USE_FOLDER" == "true" ]]; then
-    FILES_SAVED="${BRIGHT_YELLOW}$FOLDER_NAME${RESET}"
+    printf $'%b%-61s%b%b\n' "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}" "$FOLDER_NAME" "${RESET}" "${BRIGHT_GREEN}║${RESET}"
 else
-    FILES_SAVED="${BRIGHT_YELLOW}Current directory${RESET}"
+    printf $'%bCurrent directory%-47s%b%b\n' "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}" "" "${RESET}" "${BRIGHT_GREEN}║${RESET}"
 fi
 
-# Mode line - Store colored text
+# Mode line  
 if [[ "$IS_PLAYLIST" == "true" ]]; then
-    MODE_TEXT="${BRIGHT_GREEN}FULL PLAYLIST${RESET}"
+    printf $'%bFULL PLAYLIST%-55s%b%b\n' "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_GREEN}" "" "${RESET}" "${BRIGHT_GREEN}║${RESET}"
 else
-    MODE_TEXT="${BRIGHT_BLUE}SINGLE VIDEO ONLY${RESET}"
+    printf $'%bSINGLE VIDEO ONLY%-51s%b%b\n' "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_BLUE}" "" "${RESET}" "${BRIGHT_GREEN}║${RESET}"
 fi
-
-# Calculate padding manually
-FILES_PADDING=$(printf '%*s' $((78 - ${#FILES_SAVED} - ${#CYAN}Files saved:${RESET} + 20)) "")  # +20 to account for color codes
-MODE_PADDING=$(printf '%*s' $((78 - ${#MODE_TEXT} - ${#CYAN}• Mode:${RESET} + 20)) "")  # +20 to account for color codes
-
-echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${FILES_SAVED}${FILES_PADDING}${BRIGHT_GREEN}║${RESET}"
-echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${MODE_TEXT}${MODE_PADDING}${BRIGHT_GREEN}║${RESET}"
 
 echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
@@ -620,6 +614,8 @@ echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Made with ❤️  for Tanzania by Joh
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${RESET}"
 echo ""
+
+
 
 # === SIGNATURE: QUOTE FROM JOHN BOSCO + ALIEN ART (GREEN) ===
 echo -e "\033[38;5;194m\"Out here doing some Alien things, Jesus is King...\" ~johnboscocjt (Isaiah 28:21)\033[0m"
