@@ -35,8 +35,8 @@
 YutubuDownload now features a **cyberpunk-inspired terminal interface** with:
 - 🔵 **Animated green loading pulses** for smooth feedback
 - 🔴 **Flashing red alerts** for critical errors
-- 🟢 **Hacker-green ASCII art** + **Swahili-tech block headers**
-- ✨ **Faith-powered closing flourish** with cosmic wave animation
+- 🟢 **Hacker-green ASCII art** 
+- ✨ **Faith-powered closing flourish**
 
 Your terminal doesn’t just download — it **declares Kingdom authority over the digital realm**.
 
