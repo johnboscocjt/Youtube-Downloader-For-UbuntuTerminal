@@ -17,58 +17,6 @@ print_loading() {
     echo -e " ✅\033[0m"
 }
 
-# Function to check if deno is installed (for any user)
-check_deno_installed() {
-    # Check if deno is in PATH for current user
-    if command -v deno &> /dev/null; then
-        return 0
-    fi
-    
-    # Check if deno is in common locations
-    local deno_paths=(
-        "/usr/local/bin/deno"
-        "/usr/bin/deno"
-        "/bin/deno"
-        "/root/.deno/bin/deno"
-    )
-    
-    for path in "${deno_paths[@]}"; do
-        if [ -f "$path" ]; then
-            return 0
-        fi
-    done
-    
-    # Check if regular user has deno
-    local current_user="${SUDO_USER:-$USER}"
-    if [ -n "$current_user" ] && [ "$current_user" != "root" ]; then
-        local user_home=$(eval echo "~$current_user")
-        if [ -f "$user_home/.deno/bin/deno" ]; then
-            return 0
-        fi
-    fi
-    
-    return 1
-}
-
-# Function to get deno version if available
-get_deno_version() {
-    if command -v deno &> /dev/null; then
-        deno --version 2>/dev/null | head -1 | awk '{print $2}' 2>/dev/null || echo "installed"
-    elif [ -f "/usr/local/bin/deno" ]; then
-        /usr/local/bin/deno --version 2>/dev/null | head -1 | awk '{print $2}' 2>/dev/null || echo "installed"
-    elif [ -f "/root/.deno/bin/deno" ]; then
-        /root/.deno/bin/deno --version 2>/dev/null | head -1 | awk '{print $2}' 2>/dev/null || echo "installed"
-    else
-        local current_user="${SUDO_USER:-$USER}"
-        if [ -n "$current_user" ] && [ "$current_user" != "root" ]; then
-            local user_home=$(eval echo "~$current_user")
-            if [ -f "$user_home/.deno/bin/deno" ]; then
-                "$user_home/.deno/bin/deno" --version 2>/dev/null | head -1 | awk '{print $2}' 2>/dev/null || echo "installed"
-            fi
-        fi
-    fi
-}
-
 # Check root privileges
 if [[ $EUID -ne 0 ]]; then
     echo "❌ ERROR: This installer requires root privileges."
@@ -161,61 +109,67 @@ else
     fi
 fi
 
-# STEP 3: Deno - IMPROVED DETECTION
+# STEP 3: Deno - SIMPLIFIED VERSION
 echo ""
 echo "📦 STEP 3/5: Checking Deno (JavaScript runtime)..."
 CURRENT_USER="${SUDO_USER:-$USER}"
-USER_HOME=""
-if [ -n "$CURRENT_USER" ] && [ "$CURRENT_USER" != "root" ]; then
-    USER_HOME=$(eval echo "~$CURRENT_USER")
-fi
 
-if check_deno_installed; then
-    DENO_VERSION=$(get_deno_version)
-    echo "   ✅ Deno already installed (v${DENO_VERSION})"
+# Check if deno is already accessible
+if command -v deno &> /dev/null; then
+    DENO_VERSION=$(deno --version 2>/dev/null | head -1 | awk '{print $2}' 2>/dev/null || echo "installed")
+    echo "   ✅ Deno already available in PATH (v${DENO_VERSION})"
 else
-    print_loading "   ⬇️  Installing Deno"
-    
-    # Try system-wide installation first
-    curl -fsSL https://deno.land/x/install/install.sh | DENO_INSTALL=/usr/local sh > /dev/null 2>&1
-    
-    # Check if installation succeeded
-    if [ -f "/usr/local/bin/deno" ]; then
-        chmod +x /usr/local/bin/deno 2>/dev/null
-        echo "   ✅ Deno installed system-wide to /usr/local/bin/deno"
-    else
-        # Try alternative method for root
-        curl -fsSL https://deno.land/install.sh | sh -s v1.x > /dev/null 2>&1
-        if [ -f "/root/.deno/bin/deno" ]; then
-            # Add to root's PATH
-            echo 'export DENO_INSTALL="/root/.deno"' >> /root/.bashrc
-            echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> /root/.bashrc
-            echo 'export PATH="/root/.deno/bin:$PATH"' >> /root/.bashrc
-            # Also add to current session
-            export PATH="/root/.deno/bin:$PATH"
-            echo "   ✅ Deno installed for root user"
-        elif [ -n "$USER_HOME" ] && [ -f "$USER_HOME/.deno/bin/deno" ]; then
-            echo "   ✅ Deno already installed for user $CURRENT_USER"
+    # Check if user has deno in their home directory
+    if [ -n "$CURRENT_USER" ] && [ "$CURRENT_USER" != "root" ]; then
+        USER_HOME=$(eval echo "~$CURRENT_USER")
+        if [ -f "$USER_HOME/.deno/bin/deno" ]; then
+            DENO_VERSION=$("$USER_HOME/.deno/bin/deno" --version 2>/dev/null | head -1 | awk '{print $2}' 2>/dev/null || echo "installed")
+            echo "   ✅ Deno installed for user $CURRENT_USER (v${DENO_VERSION})"
+            echo "   ℹ️  Note: When running as root, Deno is not in PATH. But YutubuDownload will work when"
+            echo "       running as regular user (without sudo)."
+            
+            # Add deno to user's PATH for future if not already there
+            for rcfile in "$USER_HOME/.bashrc" "$USER_HOME/.zshrc"; do
+                if [ -f "$rcfile" ] && ! grep -q '.deno/bin' "$rcfile" 2>/dev/null; then
+                    echo 'export PATH="$HOME/.deno/bin:$PATH"' >> "$rcfile"
+                    chown "$CURRENT_USER:$CURRENT_USER" "$rcfile"
+                fi
+            done
         else
-            echo "   ⚠️  Deno installation attempted but not detected in standard locations."
-            echo "      If you have Deno installed, it should work when running as regular user."
-        fi
-    fi
-fi
-
-# Ensure regular user has Deno in PATH
-if [ -n "$USER_HOME" ] && [ "$CURRENT_USER" != "root" ]; then
-    # Check if Deno is in user's shell config
-    for rcfile in "$USER_HOME/.bashrc" "$USER_HOME/.zshrc"; do
-        if [ -f "$rcfile" ]; then
-            # Check if Deno path is already in the file
-            if ! grep -q '.deno/bin' "$rcfile" 2>/dev/null; then
-                # Add Deno to PATH
-                echo 'export DENO_INSTALL="$HOME/.deno"' | sudo -u "$CURRENT_USER" tee -a "$rcfile" > /dev/null
-                echo 'export PATH="$DENO_INSTALL/bin:$PATH"' | sudo -u "$CURRENT_USER" tee -a "$rcfile" > /dev/null
+            print_loading "   ⬇️  Installing Deno"
+            # Simple direct download method - no piping through sh
+            curl -fsSL https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip -o /tmp/deno.zip 2>/dev/null
+            if [ -f /tmp/deno.zip ]; then
+                unzip -q -o /tmp/deno.zip -d /usr/local/bin/ 2>/dev/null
+                chmod +x /usr/local/bin/deno 2>/dev/null
+                rm -f /tmp/deno.zip 2>/dev/null
+                if [ -f /usr/local/bin/deno ]; then
+                    echo "   ✅ Deno installed to /usr/local/bin/deno"
+                else
+                    echo "   ⚠️  Could not install Deno (non-critical for basic functionality)"
+                    echo "      You can install it manually later if needed for advanced features."
+                fi
+            else
+                echo "   ⚠️  Could not download Deno (non-critical for basic functionality)"
             fi
         fi
-    done
+    else
+        print_loading "   ⬇️  Installing Deno for root"
+        # Simple direct download for root
+        curl -fsSL https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip -o /tmp/deno.zip 2>/dev/null
+        if [ -f /tmp/deno.zip ]; then
+            unzip -q -o /tmp/deno.zip -d /usr/local/bin/ 2>/dev/null
+            chmod +x /usr/local/bin/deno 2>/dev/null
+            rm -f /tmp/deno.zip 2>/dev/null
+            if [ -f /usr/local/bin/deno ]; then
+                echo "   ✅ Deno installed to /usr/local/bin/deno"
+            else
+                echo "   ⚠️  Could not install Deno (non-critical for basic functionality)"
+            fi
+        else
+            echo "   ⚠️  Could not download Deno (non-critical for basic functionality)"
+        fi
+    fi
 fi
 
 # STEP 4: Python venv for cookies
@@ -295,33 +249,18 @@ echo "Version: YutubuDownload v1.0 (2026-02-08)"
 echo "Repository: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal"
 echo ""
 
-# Installation summary
-echo "📊 Installation Summary:"
-echo "   ✅ System dependencies: ffmpeg, python3-venv, python3-pip"
-echo "   ✅ yt-dlp: $(yt-dlp --version 2>/dev/null || echo 'Not installed')"
-
-# Deno status
-if check_deno_installed; then
-    DENO_VERSION=$(get_deno_version)
-    echo "   ✅ Deno: v${DENO_VERSION} (installed)"
-    if [ -f "/home/jbtechnix/.deno/bin/deno" ]; then
-        echo "       Location: /home/jbtechnix/.deno/bin/deno"
-        echo "       Note: Deno is installed for user 'jbtechnix'. When running YutubuDownload"
-        echo "             as a regular user (not sudo), it will use your Deno installation."
-    elif [ -f "/root/.deno/bin/deno" ]; then
-        echo "       Location: /root/.deno/bin/deno"
-    elif [ -f "/usr/local/bin/deno" ]; then
-        echo "       Location: /usr/local/bin/deno (system-wide)"
+# Quick test
+echo "📊 Quick System Check:"
+echo -n "   yt-dlp: " && command -v yt-dlp &>/dev/null && yt-dlp --version | head -1 || echo "Not found"
+echo -n "   Deno: " && (command -v deno &>/dev/null && echo "Available" || echo "Not in root PATH")
+if [ -n "$CURRENT_USER" ] && [ "$CURRENT_USER" != "root" ]; then
+    USER_HOME=$(eval echo "~$CURRENT_USER")
+    if [ -f "$USER_HOME/.deno/bin/deno" ]; then
+        echo "   Deno location: $USER_HOME/.deno/bin/deno (user installation)"
+        echo ""
+        echo "💡 IMPORTANT: Since you have Deno as user '$CURRENT_USER',"
+        echo "   run YutubuDownload WITHOUT sudo:"
+        echo "   cd ~/youtubedownloading && YutubuDownload"
     fi
-else
-    echo "   ⚠️  Deno: Not detected in standard locations"
-    echo "       You have Deno installed as user 'jbtechnix'. To use it:"
-    echo "       1. Run YutubuDownload as regular user (without sudo)"
-    echo "       2. Or install Deno system-wide: sudo curl -fsSL https://deno.land/x/install/install.sh | sudo DENO_INSTALL=/usr/local sh"
 fi
-
-echo "   ✅ YutubuDownload: Installed to /usr/local/bin/YutubuDownload"
-echo ""
-echo "💡 IMPORTANT: Since Deno is installed as user 'jbtechnix', run YutubuDownload without sudo:"
-echo "   cd ~/youtubedownloading && YutubuDownload"
 echo ""
