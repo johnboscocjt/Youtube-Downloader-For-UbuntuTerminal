@@ -582,22 +582,29 @@ fi
 echo ""
 echo -e "${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at %-52s ${BRIGHT_GREEN}║${RESET}\n" "$(date '+%I:%M:%S %p')"
+echo -e "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at $(date '+%I:%M:%S %p')                                           ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 
-# Files saved line - using printf with -e flag
+# Files saved line - Store colored text
 if [[ "$USE_FOLDER" == "true" ]]; then
-    printf "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}%-61s${RESET} ${BRIGHT_GREEN}║${RESET}\n" "$FOLDER_NAME"
+    FILES_SAVED="${BRIGHT_YELLOW}$FOLDER_NAME${RESET}"
 else
-    printf "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${BRIGHT_YELLOW}Current directory${RESET}%-47s ${BRIGHT_GREEN}║${RESET}\n" ""
+    FILES_SAVED="${BRIGHT_YELLOW}Current directory${RESET}"
 fi
 
-# Mode line  
+# Mode line - Store colored text
 if [[ "$IS_PLAYLIST" == "true" ]]; then
-    printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_GREEN}FULL PLAYLIST${RESET}%-55s ${BRIGHT_GREEN}║${RESET}\n" ""
+    MODE_TEXT="${BRIGHT_GREEN}FULL PLAYLIST${RESET}"
 else
-    printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${BRIGHT_BLUE}SINGLE VIDEO ONLY${RESET}%-51s ${BRIGHT_GREEN}║${RESET}\n" ""
+    MODE_TEXT="${BRIGHT_BLUE}SINGLE VIDEO ONLY${RESET}"
 fi
+
+# Calculate padding manually
+FILES_PADDING=$(printf '%*s' $((78 - ${#FILES_SAVED} - ${#CYAN}Files saved:${RESET} + 20)) "")  # +20 to account for color codes
+MODE_PADDING=$(printf '%*s' $((78 - ${#MODE_TEXT} - ${#CYAN}• Mode:${RESET} + 20)) "")  # +20 to account for color codes
+
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} ${FILES_SAVED}${FILES_PADDING}${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} ${MODE_TEXT}${MODE_PADDING}${BRIGHT_GREEN}║${RESET}"
 
 echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
