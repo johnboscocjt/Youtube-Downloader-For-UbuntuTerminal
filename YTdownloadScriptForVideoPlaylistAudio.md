@@ -207,30 +207,53 @@ Since late 2025, YouTube encrypts video signatures in JavaScript. yt-dlp **requi
 
 set -euo pipefail
 
+# === COLOR DEFINITIONS ===
+RESET="\033[0m"
+BLACK="\033[30m"
+RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+BLUE="\033[34m"
+MAGENTA="\033[35m"
+CYAN="\033[36m"
+WHITE="\033[37m"
+BRIGHT_RED="\033[91m"
+BRIGHT_GREEN="\033[92m"
+BRIGHT_YELLOW="\033[93m"
+BRIGHT_BLUE="\033[94m"
+BRIGHT_MAGENTA="\033[95m"
+BRIGHT_CYAN="\033[96m"
+BRIGHT_WHITE="\033[97m"
+ORANGE="\033[38;5;214m"
+PINK="\033[38;5;206m"
+LIME="\033[38;5;46m"
+SKY_BLUE="\033[38;5;39m"
+HOT_PINK="\033[38;5;196m"
+
 # === ANIMATED FEEDBACK FUNCTIONS ===
 print_loading() {
     local msg="$1"
-    echo -ne "\033[38;5;46m$msg\033[0m"
+    echo -ne "${SKY_BLUE}$msg${RESET}"
     for _ in {1..5}; do
         echo -ne "."
         sleep 0.3
     done
-    echo -e " ✅\033[0m"
+    echo -e " ${BRIGHT_GREEN}✅${RESET}"
 }
 
 print_error() {
     local msg="$1"
-    echo -ne "\033[38;5;196m$msg\033[0m"
+    echo -ne "${HOT_PINK}$msg${RESET}"
     for _ in {1..3}; do
         echo -ne " ❗"
         sleep 0.2
     done
-    echo -e " ❌\033[0m"
+    echo -e " ${RED}❌${RESET}"
 }
 
-# Version check
+# Version check (early exit, no banners)
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.0 (2026-02-08) • Tanzania-Optimized"
+    echo "YutubuDownload v1.0.1 (2026-02-08) • Tanzania-Optimized"
     exit 0
 fi
 
@@ -244,14 +267,13 @@ fi
   echo "YutubuDownload"
 }
 
-
 # === CUSTOM SWAHILI-TECH HEADER (COLORED BLOCK ART) ===
 {
- echo "YutubuDownload. v1.0"
+    echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.1${RESET}"
 } >/dev/tty 2>/dev/null || echo ""
 
 # === SMART COOKIE REFRESH (ANIMATED) ===
-echo -e "\033[38;5;39m🔄 Preparing Chrome cookies (Tanzania-optimized)...\033[0m"
+echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
 pkill -f "chrome" 2>/dev/null || true
 pkill -f "chromium" 2>/dev/null || true
 pkill -f "crashpad" 2>/dev/null || true
@@ -263,7 +285,7 @@ CHROME_PID=$!
 sleep 3
 kill $CHROME_PID 2>/dev/null || true
 wait $CHROME_PID 2>/dev/null || true
-echo -e "\033[38;5;46m✅ Cookies refreshed in 8 seconds\033[0m"
+echo -e "${LIME}✅ Cookies refreshed in 8 seconds${RESET}"
 echo ""
 
 # === ROBUST DBUS SESSION SETUP ===
@@ -284,16 +306,16 @@ fi
 VENV_PATH="$HOME/youtubedownloading/yt-venv/bin/activate"
 if [ -f "$VENV_PATH" ]; then
     source "$VENV_PATH" 2>/dev/null || true
-    echo -e "\033[38;5;46m✅ Activated virtual environment (yt-venv) for cookie decryption\033[0m"
+    echo -e "${LIME}✅ Activated virtual environment (yt-venv) for cookie decryption${RESET}"
 else
     VENV_PATH="/root/youtubedownloading/yt-venv/bin/activate"
     if [ -f "$VENV_PATH" ]; then
         source "$VENV_PATH" 2>/dev/null || true
-        echo -e "\033[38;5;46m✅ Activated system virtual environment (yt-venv)\033[0m"
+        echo -e "${LIME}✅ Activated system virtual environment (yt-venv)${RESET}"
     else
         print_error "⚠️  Warning: yt-venv not found at ~/youtubedownloading/yt-venv"
         echo "   Cookie decryption may fail. Run installer:"
-        echo "   sudo bash -c '\$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)'"
+        echo -e "   ${CYAN}sudo bash -c '\$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)'${RESET}"
     fi
 fi
 
@@ -303,13 +325,14 @@ echo ""
 if ! command -v yt-dlp &> /dev/null; then
     print_error "❌ ERROR: yt-dlp not found!"
     echo "   Install with installer:"
-    echo "   sudo bash -c '\$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)'"
+    echo -e "   ${CYAN}sudo bash -c '\$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)'${RESET}"
     exit 1
 fi
 
 if ! command -v ffmpeg &> /dev/null; then
     print_error "⚠️  WARNING: ffmpeg missing → Videos will have NO AUDIO!"
-    echo "   Install IMMEDIATELY: sudo apt install ffmpeg"
+    echo "   Install IMMEDIATELY:"
+    echo -e "   ${CYAN}sudo apt install ffmpeg${RESET}"
     echo ""
 fi
 
@@ -317,19 +340,23 @@ fi
 JS_RUNTIME=""
 if command -v deno &> /dev/null; then
     JS_RUNTIME="--js-runtimes deno"
-    echo -e "\033[38;5;39m⚡ Using Deno for YouTube JS challenges (recommended)\033[0m"
+    echo -e "${SKY_BLUE}⚡ Using Deno for YouTube JS challenges (recommended)${RESET}"
 elif command -v node &> /dev/null; then
     JS_RUNTIME="--js-runtimes node"
-    echo -e "\033[38;5;39m⚡ Using Node.js for YouTube JS challenges\033[0m"
+    echo -e "${SKY_BLUE}⚡ Using Node.js for YouTube JS challenges${RESET}"
 else
     print_error "⚠️  WARNING: No JS runtime found! YouTube may block high-quality downloads."
-    echo "   Install Deno (recommended): curl -fsSL https://deno.land/install.sh | sh"
+    echo "   Install Deno (recommended):"
+    echo -e "   ${CYAN}curl -fsSL https://deno.land/install.sh | sh${RESET}"
 fi
 echo ""
 
-# URL input
-echo " paste YouTube link (video or playlist):"
-echo -n "> "
+# URL input - Enhanced visibility
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${BRIGHT_CYAN}📥 URL INPUT${RESET}"
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${CYAN}Enter YouTube URL (video or playlist):${RESET}"
+echo -n -e "${BRIGHT_CYAN}> ${RESET}"
 read -r URL || { echo ""; exit 1; }
 URL=$(echo "$URL" | xargs)
 
@@ -340,10 +367,13 @@ fi
 echo ""
 
 # Download type selection
-echo "What to download?"
-echo " 1 = Single video (ignores playlist params in URL)"
-echo " 2 = Full playlist"
-echo -n "Enter choice (1/2) [default=1]: "
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${BRIGHT_CYAN}📋 DOWNLOAD TYPE${RESET}"
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${CYAN}What to download?${RESET}"
+echo -e "  ${BRIGHT_BLUE}1${RESET} = Single video (ignores playlist params in URL)"
+echo -e "  ${BRIGHT_BLUE}2${RESET} = Full playlist"
+echo -n -e "${BRIGHT_CYAN}Enter choice (1/2) [default=1]: ${RESET}"
 read -r TYPE_CHOICE || TYPE_CHOICE="1"
 TYPE_CHOICE="${TYPE_CHOICE:-1}"
 TYPE_CHOICE=$(echo "$TYPE_CHOICE" | xargs)
@@ -356,18 +386,21 @@ if [[ "$TYPE_CHOICE" == "2" ]]; then
     IS_PLAYLIST="true"
     PLAYLIST_FLAG="--yes-playlist"
     echo ""
-    echo -e "\033[38;5;39mℹ️  Playlist mode: Will download ALL videos in playlist\033[0m"
+    echo -e "${SKY_BLUE}ℹ️  Playlist mode: Will download ALL videos in playlist${RESET}"
 else
     echo ""
-    echo -e "\033[38;5;39mℹ️  Single video mode: Will download ONLY this video (ignores ?list= params)\033[0m"
+    echo -e "${SKY_BLUE}ℹ️  Single video mode: Will download ONLY this video (ignores ?list= params)${RESET}"
 fi
 echo ""
 
 # Format selection
-echo "Download as:"
-echo " 1 = Video (with audio)"
-echo " 2 = MP3 (audio only)"
-echo -n "Enter choice (1/2) [default=1]: "
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${BRIGHT_CYAN}🎵 FORMAT SELECTION${RESET}"
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${CYAN}Download as:${RESET}"
+echo -e "  ${BRIGHT_BLUE}1${RESET} = Video (with audio)"
+echo -e "  ${BRIGHT_BLUE}2${RESET} = MP3 (audio only)"
+echo -n -e "${BRIGHT_CYAN}Enter choice (1/2) [default=1]: ${RESET}"
 read -r FORMAT_CHOICE || FORMAT_CHOICE="1"
 FORMAT_CHOICE="${FORMAT_CHOICE:-1}"
 FORMAT_CHOICE=$(echo "$FORMAT_CHOICE" | xargs)
@@ -382,11 +415,11 @@ if [[ "$FORMAT_CHOICE" == "2" ]]; then
     MP3_FLAGS="-x --audio-format mp3"
     
     echo ""
-    echo "MP3 quality options:"
-    echo " 1 = Best (VBR ~320kbps)"
-    echo " 2 = High (192kbps)"
-    echo " 3 = Medium (128kbps)"
-    echo -n "Enter choice (1-3) [default=1]: "
+    echo -e "${CYAN}MP3 quality options:${RESET}"
+    echo -e "  ${BRIGHT_BLUE}1${RESET} = Best (VBR ~320kbps)"
+    echo -e "  ${BRIGHT_BLUE}2${RESET} = High (192kbps)"
+    echo -e "  ${BRIGHT_BLUE}3${RESET} = Medium (128kbps)"
+    echo -n -e "${BRIGHT_CYAN}Enter choice (1-3) [default=1]: ${RESET}"
     read -r QUAL_CHOICE || QUAL_CHOICE="1"
     QUAL_CHOICE="${QUAL_CHOICE:-1}"
     QUAL_CHOICE=$(echo "$QUAL_CHOICE" | xargs)
@@ -404,7 +437,10 @@ echo ""
 
 # === ENHANCED QUALITY SELECTION (ALL STANDARD RESOLUTIONS ≥360P) ===
 if [[ "$IS_MP3" == "false" ]]; then
-    echo -e "\033[38;5;39m🔍 Fetching available qualities... (usually 2-5 seconds)\033[0m"
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    echo -e "${BRIGHT_CYAN}🎬 QUALITY SELECTION${RESET}"
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    echo -e "${SKY_BLUE}🔍 Fetching available qualities... (usually 2-5 seconds)${RESET}"
     
     ACTUAL_HEIGHTS=$(timeout 15 yt-dlp --cookies-from-browser chrome --no-playlist \
         --print "%(height)s" "$URL" 2>/dev/null | \
@@ -431,8 +467,8 @@ if [[ "$IS_MP3" == "false" ]]; then
     
     DISPLAY_HEIGHTS=$(echo $DISPLAY_HEIGHTS | tr ' ' '\n' | sort -nur | uniq | tr '\n' ' ')
     
-    echo -e "\033[38;5;46m✅ Available standard qualities: $DISPLAY_HEIGHTS\033[0m"
-    echo -n "Enter max height (e.g. 720, 1080) [default=720]: "
+    echo -e "${LIME}✅ Available standard qualities: $DISPLAY_HEIGHTS${RESET}"
+    echo -n -e "${BRIGHT_CYAN}Enter max height (e.g. 720, 1080) [default=720]: ${RESET}"
     read -r MAX_HEIGHT || MAX_HEIGHT="720"
     MAX_HEIGHT="${MAX_HEIGHT:-720}"
     MAX_HEIGHT=$(echo "$MAX_HEIGHT" | xargs)
@@ -449,20 +485,24 @@ fi
 echo ""
 
 # Folder organization
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${BRIGHT_CYAN}📁 FOLDER ORGANIZATION${RESET}"
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+
 FOLDER_NAME=""
 USE_FOLDER="false"
 
 if [[ "$IS_PLAYLIST" == "true" ]]; then
-    echo "📁 Create dedicated folder for playlist? (HIGHLY RECOMMENDED)"
+    echo -e "${CYAN}Create dedicated folder for playlist? (HIGHLY RECOMMENDED)${RESET}"
     echo "   Prevents mixing files from playlists with identical names"
-    echo -n "   y = Yes (safe default) | n = No [default=y]: "
+    echo -n -e "   ${BRIGHT_CYAN}y${RESET} = Yes (safe default) | ${BRIGHT_CYAN}n${RESET} = No [default=y]: "
     read -r FOLDER_CHOICE || FOLDER_CHOICE="y"
     FOLDER_CHOICE="${FOLDER_CHOICE:-y}"
     FOLDER_CHOICE=$(echo "$FOLDER_CHOICE" | xargs | tr '[:upper:]' '[:lower:]')
     
     if [[ "${FOLDER_CHOICE}" == "y" || "${FOLDER_CHOICE}" == "" ]]; then
         USE_FOLDER="true"
-        echo -n "Folder name? (leave blank for auto): "
+        echo -n -e "${BRIGHT_CYAN}Folder name? (leave blank for auto): ${RESET}"
         read -r FOLDER_NAME || FOLDER_NAME=""
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
         FOLDER_NAME="${FOLDER_NAME:-%(playlist_title)s [%(playlist_id)s]}"
@@ -471,14 +511,14 @@ if [[ "$IS_PLAYLIST" == "true" ]]; then
         OUTPUT_TEMPLATE="%(playlist_index)02d - %(title)s.%(ext)s"
     fi
 else
-    echo -n "📁 Save in custom folder? (y/n) [default=n]: "
+    echo -n -e "${CYAN}Save in custom folder? (${BRIGHT_CYAN}y${RESET}/${BRIGHT_CYAN}n${RESET}) [default=n]: ${RESET}"
     read -r FOLDER_CHOICE || FOLDER_CHOICE="n"
     FOLDER_CHOICE="${FOLDER_CHOICE:-n}"
     FOLDER_CHOICE=$(echo "$FOLDER_CHOICE" | xargs | tr '[:upper:]' '[:lower:]')
     
     if [[ "${FOLDER_CHOICE}" == "y" ]]; then
         USE_FOLDER="true"
-        echo -n "Folder name (e.g. 'BongoFlava'): "
+        echo -n -e "${BRIGHT_CYAN}Folder name (e.g. 'BongoFlava'): ${RESET}"
         read -r FOLDER_NAME || FOLDER_NAME="Downloads"
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
         FOLDER_NAME="${FOLDER_NAME:-Downloads}"
@@ -502,16 +542,18 @@ if [[ "$IS_PLAYLIST" == "false" && -n "$VIDEO_ID" ]]; then
     touch "$ARCHIVE_FILE" 2>/dev/null || true
     
     if grep -qxF "$VIDEO_ID" "$ARCHIVE_FILE" 2>/dev/null; then
-        print_error "⚠️  ⚠️  ⚠️  VIDEO ALREADY IN ARCHIVE  ⚠️  ⚠️  ⚠️"
+        echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+        echo -e "${ORANGE}⚠️  ⚠️  ⚠️  VIDEO ALREADY IN ARCHIVE  ⚠️  ⚠️  ⚠️${RESET}"
+        echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
         echo ""
-        echo "   Video ID: $VIDEO_ID"
-        echo "   ⚠️  Archive only means yt-dlp *attempted* download before"
-        echo "   ⚠️  File might be MISSING or CORRUPTED!"
+        echo -e "   ${CYAN}Video ID:${RESET} $VIDEO_ID"
+        echo -e "   ${ORANGE}⚠️  Archive only means yt-dlp *attempted* download before${RESET}"
+        echo -e "   ${ORANGE}⚠️  File might be MISSING or CORRUPTED!${RESET}"
         echo ""
-        echo "   Options:"
-        echo "     y = YES → Delete from archive + re-download"
-        echo "     n = NO  → Skip download (safe default)"
-        echo -n "   Delete from archive and re-download? (y/N): "
+        echo -e "   ${CYAN}Options:${RESET}"
+        echo -e "     ${BRIGHT_GREEN}y${RESET} = YES → Delete from archive + re-download"
+        echo -e "     ${BRIGHT_RED}n${RESET} = NO  → Skip download (safe default)"
+        echo -n -e "   ${BRIGHT_CYAN}Delete from archive and re-download? (y/N): ${RESET}"
         read -r CHOICE
         CHOICE=$(echo "${CHOICE:-n}" | tr '[:upper:]' '[:lower:]')
         echo ""
@@ -519,10 +561,10 @@ if [[ "$IS_PLAYLIST" == "false" && -n "$VIDEO_ID" ]]; then
         if [[ "$CHOICE" == "y" ]]; then
             grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
             mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-            echo -e "\033[38;5;46m✅ DELETED $VIDEO_ID from archive. Proceeding with fresh download...\033[0m"
+            echo -e "${LIME}✅ DELETED $VIDEO_ID from archive. Proceeding with fresh download...${RESET}"
             echo ""
         else
-            echo -e "\033[38;5;46m✅ SKIPPED download per your choice.\033[0m"
+            echo -e "${LIME}✅ SKIPPED download per your choice.${RESET}"
             exit 0
         fi
     fi
@@ -533,17 +575,42 @@ if [[ "$IS_PLAYLIST" == "true" ]]; then
 fi
 
 # Execution summary
-echo -e "\033[38;5;39m🚀 STARTING DOWNLOAD\033[0m"
-echo "──────────────────────────────────────────────────────────────"
-echo " URL:          $URL"
-echo " Type:         $( [[ "$IS_PLAYLIST" == "true" ]] && echo "Playlist (ALL videos)" || echo "Single Video ONLY" )"
-echo " Format:       $( [[ "$IS_MP3" == "true" ]] && echo "MP3 ($AUDIO_QUAL)" || echo "Video (max ${MAX_HEIGHT}p) WITH AUDIO" )"
-echo " Destination:  $( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
-echo " JS Runtime:   $( [[ -n "$JS_RUNTIME" ]] && echo "${JS_RUNTIME##*=}" || echo "None" )"
-echo "──────────────────────────────────────────────────────────────"
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${BRIGHT_CYAN}🚀 DOWNLOAD SUMMARY${RESET}"
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${CYAN}URL:${RESET}          $URL"
+echo -e "${CYAN}Type:${RESET}         $( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}Playlist (ALL videos)${RESET}" || echo "${BRIGHT_BLUE}Single Video ONLY${RESET}" )"
+echo -e "${CYAN}Format:${RESET}       $( [[ "$IS_MP3" == "true" ]] && echo "${BRIGHT_MAGENTA}MP3 ($AUDIO_QUAL)${RESET}" || echo "${BRIGHT_BLUE}Video (max ${MAX_HEIGHT}p) WITH AUDIO${RESET}" )"
+echo -e "${CYAN}Destination:${RESET}  $( [[ "$USE_FOLDER" == "true" ]] && echo "${BRIGHT_YELLOW}$FOLDER_NAME${RESET}" || echo "${BRIGHT_YELLOW}Current directory${RESET}" )"
+echo -e "${CYAN}JS Runtime:${RESET}   $( [[ -n "$JS_RUNTIME" ]] && echo "${BRIGHT_GREEN}${JS_RUNTIME##*=}${RESET}" || echo "${ORANGE}None${RESET}" )"
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
 
-# === FIXED yt-dlp COMMAND (WITH ANIMATED RETRIES) ===
+# === ENHANCED PROGRESS BAR CONFIGURATION ===
+BAR_WIDTH=20
+
+# Cursor movement
+CSI="\033["
+HIDE_CURSOR="${CSI}?25l"
+SHOW_CURSOR="${CSI}?25h"
+CLEAR_LINE="${CSI}2K"
+GOTO_COL1="${CSI}0G"
+UP_1="${CSI}1A"
+DOWN_1="${CSI}1B"
+
+# Hide cursor and set up cleanup trap
+echo -e "$HIDE_CURSOR"
+trap 'echo -e "${SHOW_CURSOR}"; echo -e "\r${CLEAR_LINE}${GOTO_COL1}"; echo -e "${UP_1}${CLEAR_LINE}${GOTO_COL1}"; exit' INT TERM EXIT
+
+# Display location based on user choice
+DISPLAY_LOCATION="${FOLDER_NAME:-Current directory}"
+
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
+echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
+
+# === FIXED yt-dlp COMMAND WITH GREEN PROGRESS BAR ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
     if yt-dlp \
@@ -559,8 +626,110 @@ for ATTEMPT in 1 2 3; do
         --no-overwrites \
         --merge-output-format mp4 \
         $ARCHIVE_FLAG \
-        --progress \
-        "$URL" 2>&1; then
+        --newline \
+        --no-warnings \
+        --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
+        --output-na-placeholder "-" \
+        "$URL" 2>&1 | while IFS= read -r line; do
+        
+        # Handle metadata lines - Color them!
+        if [[ "$line" =~ ^\[ ]]; then
+            # Color different types of metadata lines
+            if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]]; then
+                # Playlist download start
+                echo -e "${BRIGHT_MAGENTA}$line${RESET}"
+            elif [[ "$line" =~ ^\[download\].*Downloading.*item.*of ]]; then
+                # Individual video download start
+                echo -e "${BRIGHT_CYAN}$line${RESET}"
+            elif [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
+                # URL extraction
+                echo -e "${SKY_BLUE}$line${RESET}"
+            elif [[ "$line" =~ ^\[youtube\].*Downloading.*webpage ]]; then
+                # Webpage download
+                echo -e "${CYAN}$line${RESET}"
+            elif [[ "$line" =~ ^\[youtube\].*\[jsc: ]]; then
+                # JS challenge solving
+                echo -e "${BRIGHT_GREEN}$line${RESET}"
+            elif [[ "$line" =~ ^\[info\].*Downloading.*format ]]; then
+                # Format info
+                echo -e "${LIME}$line${RESET}"
+            elif [[ "$line" =~ ^\[download\] ]]; then
+                # Generic download messages
+                echo -e "${BRIGHT_BLUE}$line${RESET}"
+            elif [[ "$line" =~ ^\[youtube\] ]]; then
+                # Generic youtube messages
+                echo -e "${BLUE}$line${RESET}"
+            elif [[ "$line" =~ ^\[ExtractAudio\] ]]; then
+                # MP3 conversion
+                echo -e "${BRIGHT_GREEN}$line${RESET}"
+            elif [[ "$line" =~ ^\[Merger\] ]]; then
+                # Audio/video merging
+                echo -e "${BRIGHT_GREEN}$line${RESET}"
+            else
+                # Other metadata
+                echo -e "${CYAN}$line${RESET}"
+            fi
+            continue
+        fi
+        
+        # Parse progress line
+        read -r downloaded total percent eta speed <<< "$line"
+        
+        if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
+            percent_int="${BASH_REMATCH[1]}"
+            if [ "$percent_int" -ge 99 ]; then
+                full_bar=$(printf '█%.0s' $(seq 1 $BAR_WIDTH))
+                percent_display="100.0%"
+                if [ "$total" -gt 0 ]; then
+                    dl_mib=$(( total / 1048576 ))
+                    tot_mib=$(( total / 1048576 ))
+                else
+                    dl_mib=0
+                    tot_mib=0
+                fi
+                # Use green status directly in printf
+                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
+                    "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+            else
+                filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+                bar=$(printf '█%.0s' $(seq 1 "$filled"))
+                empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+                full_bar="$bar$empty"
+                percent_display="$percent"
+                if [ "$total" -gt 0 ]; then
+                    dl_mib=$(( downloaded / 1048576 ))
+                    tot_mib=$(( total / 1048576 ))
+                else
+                    dl_mib=0
+                    tot_mib=0
+                fi
+                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
+                    "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+            fi
+            
+            # Second line with ETA, Speed, and Location
+            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
+                "$eta" "$speed" "$DISPLAY_LOCATION"
+            
+            sleep 0.3
+        fi
+        
+        # Post-processing detection
+        if [[ "$line" =~ \[ExtractAudio\] || "$line" =~ Destination:.*\.mp3 ]] || [[ "$line" =~ \[Merger\] ]]; then
+            printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+            if [[ "$IS_MP3" == "true" ]]; then
+                printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - converting to MP3..."
+            else
+                printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - merging audio/video..."
+            fi
+            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "Post-processing in progress... please wait"
+        fi
+        
+    done; then
         DOWNLOAD_SUCCESS=true
         break
     else
@@ -570,45 +739,53 @@ for ATTEMPT in 1 2 3; do
             pkill -f "chrome" 2>/dev/null || true
             sleep 3
             google-chrome-stable --no-startup-window 2>/dev/null &
+            CHROME_PID=$!
             sleep 3
-            pkill -f "chrome" 2>/dev/null || true
-            echo -e "\033[38;5;39m🔄 Retrying (attempt $((ATTEMPT + 1))...\033[0m"
+            kill $CHROME_PID 2>/dev/null || true
+            wait $CHROME_PID 2>/dev/null || true
+            echo -e "${SKY_BLUE}🔄 Retrying (attempt $((ATTEMPT + 1))...${RESET}"
             sleep 2
         fi
     fi
 done
 
+# Show cursor again
+echo -e "${SHOW_CURSOR}"
+
 if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     echo ""
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
     print_error "❌ DOWNLOAD FAILED AFTER 3 ATTEMPTS"
-    echo "   💡 TANZANIA FIX:"
-    echo "     1. Disconnect WiFi/Ethernet"
-    echo "     2. Wait 10 seconds"
-    echo "     3. Reconnect and retry"
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    echo -e "${CYAN}   💡 TANZANIA FIX:${RESET}"
+    echo -e "     1. Disconnect WiFi/Ethernet"
+    echo -e "     2. Wait 10 seconds"
+    echo -e "     3. Reconnect and retry"
     exit 1
 fi
 
-# === PERFECTLY ALIGNED COMPLETION BOX (80 CHAR WIDTH) ===
+# === PERFECTLY ALIGNED COMPLETION BOX ===
 echo ""
-echo "╔══════════════════════════════════════════════════════════════════════════════╗"
-echo "║                                                                              ║"
-printf "║ %-76s ║\n" "✅ DOWNLOAD COMPLETE at $(date '+%I:%M:%S %p')"
-echo "║                                                                              ║"
-printf "║ %-76s ║\n" "Files saved: $( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
-printf "║ %-76s ║\n" "• Mode: $( [[ "$IS_PLAYLIST" == "true" ]] && echo "FULL PLAYLIST" || echo "SINGLE VIDEO ONLY" )"
-printf "║ %-76s ║\n" "• Audio: GUARANTEED (MP4 merge format)"
-printf "║ %-76s ║\n" "• Quality: Standard resolutions (360p-4K) always available"
-echo "║                                                                              ║"
-echo "║   💡 TANZANIA TIPS:                                                          ║"
-printf "║ %-76s ║\n" "• Single video? Script IGNORES ?list= params"
-printf "║ %-76s ║\n" "• Audio missing? Re-download at 720p (most reliable streams)"
-printf "║ %-76s ║\n" "• Bot errors? Script auto-refreshes cookies"
-printf "║ %-76s ║\n" "• Slow network? 720p works 95% of time on Vodacom/Airtel"
-echo "║                                                                              ║"
-printf "║ %-76s ║\n" "Enjoy your downloads! 🌍✨"
-printf "║ %-76s ║\n" "Made with ❤️ for Tanzania by Johnbosco (Dar es Salaam)"
-echo "║                                                                              ║"
-echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+echo -e "${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at %-52s ${BRIGHT_GREEN}║${RESET}\n" "$(date '+%I:%M:%S %p')"
+echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+printf "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} %-63s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$USE_FOLDER" == "true" ]] && echo "${BRIGHT_YELLOW}$FOLDER_NAME${RESET}" || echo "${BRIGHT_YELLOW}Current directory${RESET}" )"
+printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} %-68s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}FULL PLAYLIST${RESET}" || echo "${BRIGHT_BLUE}SINGLE VIDEO ONLY${RESET}" )"
+printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
+printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
+echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}║${RESET}    ${BRIGHT_CYAN}💡 TANZANIA TIPS:${RESET}                                                         ${BRIGHT_GREEN}║${RESET}"
+printf "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Single video? Script ${BRIGHT_GREEN}IGNORES ?list= params${RESET}                                 ${BRIGHT_GREEN}║${RESET}"
+printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Audio missing? ${BRIGHT_YELLOW}Re-download at 720p${RESET} (most reliable streams)                 ${BRIGHT_GREEN}║${RESET}"
+printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Bot errors? Script ${BRIGHT_GREEN}auto-refreshes cookies${RESET}                                  ${BRIGHT_GREEN}║${RESET}"
+printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Slow network? ${BRIGHT_YELLOW}720p works 95% of time on Vodacom/Airtel${RESET}                       ${BRIGHT_GREEN}║${RESET}"
+echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+# Hand-padded for 2-character wide emojis
+printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_MAGENTA}Enjoy your downloads! 🌍✨${RESET}                                                   ${BRIGHT_GREEN}║${RESET}"
+printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)${RESET}                       ${BRIGHT_GREEN}║${RESET}"
+echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+echo -e "${BRIGHT_GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${RESET}"
 echo ""
 
 # === SIGNATURE: QUOTE FROM JOHN BOSCO + ALIEN ART (GREEN) ===
@@ -622,6 +799,7 @@ cat << 'EOF'
          ¸¸·''                                                           ¸ ·  ˜¸  ˜
         ¸˜¨  ¸¸˜                                                    ¸.·˜¸ ·˜
        ¸'     ˜·¸                                         ¸,..--·.¸
+
       ¸'¸¸¸      ˜-.¸                                 ¸,..---···-¸˜¨¸
     ·˜¸¸¸¸¸¸¯¯˜·.¸      .¸·˜                 ¸,-·˜;;;;;;;;;;;;¸'˜
        ¸·˜ ;;;;;;,˜·¸   ˜¸      ˜.¸          ¸.˜;;;;;;;;;;;;;;;;¸'
