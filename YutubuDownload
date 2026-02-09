@@ -345,7 +345,7 @@ else
 fi
 echo ""
 
-# === SIMPLE ARCHIVE HANDLING ===
+# === SIMPLE ARCHIVE HANDLING WITH TITLES ===
 VIDEO_ID=""
 if [[ "$URL" =~ (?:v=|youtu\.be/)([^&?/]{11}) ]]; then
     VIDEO_ID="${BASH_REMATCH[1]}"
@@ -356,8 +356,8 @@ fi
 ARCHIVE_FILE="$HOME/yt-downloads-archive.txt"
 ARCHIVE_FLAG=""
 
-# For single videos, check archive and get title
-if [[ "$IS_PLAYLIST" == "false" && -n "$VIDEO_ID" && "$FORCE_DOWNLOAD" == "false" ]]; then
+# For single videos, check archive BEFORE download
+if [[ "$IS_PLAYLIST" == "false" && -n "$VIDEO_ID" ]]; then
     touch "$ARCHIVE_FILE" 2>/dev/null || true
     
     if grep -qxF "$VIDEO_ID" "$ARCHIVE_FILE" 2>/dev/null; then
@@ -374,23 +374,35 @@ if [[ "$IS_PLAYLIST" == "false" && -n "$VIDEO_ID" && "$FORCE_DOWNLOAD" == "false
         echo -e "   ${CYAN}Video Title:${RESET} $VIDEO_TITLE"
         echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
         echo ""
-        echo -e "   ${CYAN}Options:${RESET}"
-        echo -e "     ${BRIGHT_GREEN}y${RESET} = YES → Delete from archive + re-download"
-        echo -e "     ${BRIGHT_RED}n${RESET} = NO  → Skip download (safe default)"
-        echo -n -e "   ${BRIGHT_CYAN}Delete from archive and re-download? (y/N): ${RESET}"
-        read -r CHOICE
-        CHOICE=$(echo "${CHOICE:-n}" | tr '[:upper:]' '[:lower:]')
-        echo ""
         
-        if [[ "$CHOICE" == "y" ]]; then
-            grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
-            mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-            echo -e "${LIME}✅ DELETED '$VIDEO_TITLE' from archive. Proceeding with fresh download...${RESET}"
+        if [[ "$FORCE_DOWNLOAD" == "true" ]]; then
+            echo -e "${LIME}⚠️  Force download mode enabled - proceeding anyway${RESET}"
             echo ""
+            ARCHIVE_FLAG=""
         else
-            echo -e "${LIME}✅ SKIPPED '$VIDEO_TITLE' per your choice.${RESET}"
-            exit 0
+            echo -e "   ${CYAN}Options:${RESET}"
+            echo -e "     ${BRIGHT_GREEN}y${RESET} = YES → Delete from archive + re-download"
+            echo -e "     ${BRIGHT_RED}n${RESET} = NO  → Skip download (safe default)"
+            echo -n -e "   ${BRIGHT_CYAN}Delete from archive and re-download? (y/N): ${RESET}"
+            read -r CHOICE
+            CHOICE=$(echo "${CHOICE:-n}" | tr '[:upper:]' '[:lower:]')
+            echo ""
+            
+            if [[ "$CHOICE" == "y" ]]; then
+                grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+                echo -e "${LIME}✅ DELETED '$VIDEO_TITLE' from archive. Proceeding with fresh download...${RESET}"
+                echo ""
+                ARCHIVE_FLAG=""
+            else
+                echo -e "${LIME}✅ SKIPPED '$VIDEO_TITLE' per your choice.${RESET}"
+                echo -e "${CYAN}   To force download next time, use:${RESET}"
+                echo -e "${CYAN}   ./YutubuDownload --force-download${RESET}"
+                exit 0
+            fi
         fi
+    else
+        ARCHIVE_FLAG="--download-archive $ARCHIVE_FILE"
     fi
 fi
 
@@ -406,11 +418,12 @@ echo -e "${CYAN}URL:${RESET}          $URL"
 echo -e "${CYAN}Type:${RESET}         $( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}Playlist (ALL videos)${RESET}" || echo "${BRIGHT_BLUE}Single Video ONLY${RESET}" )"
 echo -e "${CYAN}Format:${RESET}       $( [[ "$IS_MP3" == "true" ]] && echo "${BRIGHT_MAGENTA}MP3 ($AUDIO_QUAL)${RESET}" || echo "${BRIGHT_BLUE}Video (max ${MAX_HEIGHT}p) WITH AUDIO${RESET}" )"
 echo -e "${CYAN}Destination:${RESET}  $( [[ "$USE_FOLDER" == "true" ]] && echo "${BRIGHT_YELLOW}$FOLDER_NAME${RESET}" || echo "${BRIGHT_YELLOW}Current directory${RESET}" )"
+echo -e "${CYAN}Archive:${RESET}      $( [[ -n "$ARCHIVE_FLAG" ]] && echo "${BRIGHT_GREEN}ENABLED${RESET}" || echo "${ORANGE}DISABLED${RESET}" )"
 echo -e "${CYAN}JS Runtime:${RESET}   $( [[ -n "$JS_RUNTIME" ]] && echo "${BRIGHT_GREEN}${JS_RUNTIME##*=}${RESET}" || echo "${ORANGE}None${RESET}" )"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
 
-# === SIMPLE PROGRESS BAR SETUP (LIKE YOUR WORKING VERSION) ===
+# === PROGRESS BAR SETUP (FROM YOUR WORKING SCRIPT - NO CHANGES) ===
 BAR_WIDTH=20
 
 # Cursor movement
@@ -433,7 +446,7 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
 
-# === SIMPLE YT-DLP COMMAND WITH WORKING PROGRESS BAR ===
+# === EXACT COPY OF YOUR WORKING YT-DLP COMMAND ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
     if yt-dlp \
@@ -455,35 +468,64 @@ for ATTEMPT in 1 2 3; do
         --output-na-placeholder "-" \
         "$URL" 2>&1 | while IFS= read -r line; do
         
-        # Handle metadata lines
+        # Handle metadata lines - Color them!
         if [[ "$line" =~ ^\[ ]]; then
-            # Skip archive messages (they're handled by yt-dlp automatically)
+            # Handle "already recorded in archive" for playlists
             if [[ "$line" =~ "has already been recorded in the archive" ]]; then
-                # Extract video ID and get title
                 if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
                     FOUND_VIDEO_ID="${BASH_REMATCH[1]}"
-                    echo ""
-                    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-                    echo -e "${ORANGE}⚠️  SKIPPING ARCHIVED VIDEO  ⚠️${RESET}"
-                    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-                    echo ""
                     
                     # Get video title
                     FOUND_VIDEO_TITLE=""
-                    if [[ -n "$FOUND_VIDEO_ID" ]]; then
+                    if [[ -n "$FOUND_VIDEO_ID" && "$IS_PLAYLIST" == "true" ]]; then
                         FOUND_VIDEO_TITLE=$(timeout 3 yt-dlp --get-title "https://youtu.be/$FOUND_VIDEO_ID" 2>/dev/null || echo "Unknown Title")
                         FOUND_VIDEO_TITLE=$(echo "$FOUND_VIDEO_TITLE" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 50)
                     fi
                     
-                    echo -e "   ${CYAN}Video:${RESET} $FOUND_VIDEO_TITLE"
-                    echo -e "   ${CYAN}ID:${RESET} $FOUND_VIDEO_ID"
-                    echo -e "   ${LIME}✅ Skipped (already downloaded)${RESET}"
                     echo ""
+                    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                    echo -e "${ORANGE}⚠️  VIDEO ALREADY IN ARCHIVE DETECTED  ⚠️${RESET}"
+                    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                    echo ""
+                    echo -e "   ${CYAN}Video ID:${RESET} $FOUND_VIDEO_ID"
+                    echo -e "   ${CYAN}Video Title:${RESET} $FOUND_VIDEO_TITLE"
+                    echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
+                    echo ""
+                    
+                    if [[ "$IS_PLAYLIST" == "true" ]]; then
+                        echo -e "   ${CYAN}Options for PLAYLIST:${RESET}"
+                        echo -e "     ${BRIGHT_GREEN}s${RESET} = SKIP this video (continue with playlist)"
+                        echo -e "     ${BRIGHT_BLUE}r${RESET} = RE-DOWNLOAD (remove from archive)"
+                        echo -e "     ${BRIGHT_RED}x${RESET} = EXIT (stop entire download)"
+                        echo -n -e "   ${BRIGHT_CYAN}Your choice (s/r/x) [default=s]: ${RESET}"
+                        read -r CHOICE </dev/tty
+                        CHOICE=$(echo "${CHOICE:-s}" | tr '[:upper:]' '[:lower:]')
+                        echo ""
+                        
+                        case "$CHOICE" in
+                            r)
+                                grep -vxF "$FOUND_VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                                mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+                                echo -e "${LIME}✅ REMOVED '$FOUND_VIDEO_TITLE' from archive${RESET}"
+                                echo -e "${SKY_BLUE}🔄 This video will be downloaded NOW${RESET}"
+                                echo ""
+                                ;;
+                            x)
+                                echo -e "${LIME}✅ Stopping playlist download per your choice${RESET}"
+                                echo -e "${SHOW_CURSOR}"
+                                exit 0
+                                ;;
+                            *)
+                                echo -e "${LIME}✅ SKIPPING '$FOUND_VIDEO_TITLE' (continuing with playlist)${RESET}"
+                                echo ""
+                                ;;
+                        esac
+                    fi
                 fi
                 continue
             fi
             
-            # Color other metadata lines normally
+            # Color different types of metadata lines
             if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]]; then
                 echo -e "${BRIGHT_MAGENTA}$line${RESET}"
             elif [[ "$line" =~ ^\[download\].*Downloading.*item.*of ]]; then
