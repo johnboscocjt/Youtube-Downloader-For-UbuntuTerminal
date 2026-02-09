@@ -424,7 +424,7 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
 
-# === FIXED yt-dlp COMMAND WITH GREEN PROGRESS BAR ===
+# === FIXED yt-dlp COMMAND WITH REAL-TIME PROGRESS ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
     if yt-dlp \
@@ -442,48 +442,69 @@ for ATTEMPT in 1 2 3; do
         $ARCHIVE_FLAG \
         --newline \
         --no-warnings \
-        --progress-template "PROGRESS:%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress._percent_str)s|%(progress._eta_str)s|%(progress._speed_str)s" \
+        --progress \
+        --progress-template "download:%(progress._percent_str)s|%(progress._eta_str)s|%(progress._speed_str)s|%(progress._total_bytes_str)s|%(progress._downloaded_bytes_str)s" \
         --output-na-placeholder "-" \
         "$URL" 2>&1 | while IFS= read -r line; do
         
-        # Parse progress line
-        if [[ "$line" =~ ^PROGRESS: ]]; then
-            IFS='|' read -r downloaded total percent eta speed <<< "${line#PROGRESS:}"
+        # Parse progress template lines
+        if [[ "$line" =~ ^download:([^|]+)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*) ]]; then
+            percent="${BASH_REMATCH[1]}"
+            eta="${BASH_REMATCH[2]}"
+            speed="${BASH_REMATCH[3]}"
+            total_bytes="${BASH_REMATCH[4]}"
+            downloaded_bytes="${BASH_REMATCH[5]}"
             
             if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
                 percent_int="${BASH_REMATCH[1]}"
-                if [ "$percent_int" -ge 99 ]; then
-                    full_bar=$(printf '█%.0s' $(seq 1 $BAR_WIDTH))
-                    percent_display="100.0%"
-                    if [[ "$total" != "-" ]] && [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
-                        dl_mib=$(( downloaded / 1048576 ))
-                        tot_mib=$(( total / 1048576 ))
-                    else
-                        dl_mib=0
-                        tot_mib=0
-                    fi
-                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
-                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
-                else
-                    filled=$(( (percent_int * BAR_WIDTH) / 100 ))
-                    bar=$(printf '█%.0s' $(seq 1 "$filled"))
-                    empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
-                    full_bar="$bar$empty"
-                    percent_display="$percent"
-                    if [[ "$total" != "-" ]] && [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
-                        dl_mib=$(( downloaded / 1048576 ))
-                        tot_mib=$(( total / 1048576 ))
-                    else
-                        dl_mib=0
-                        tot_mib=0
-                    fi
-                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
-                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+                
+                # Calculate MiB values
+                dl_mib=0
+                tot_mib=0
+                
+                # Parse downloaded bytes (e.g., "3.00MiB")
+                if [[ "$downloaded_bytes" =~ ^([0-9.]+)([KMG])?i?B$ ]]; then
+                    num="${BASH_REMATCH[1]}"
+                    unit="${BASH_REMATCH[2]:-B}"
+                    case "$unit" in
+                        K) dl_mib=$(echo "$num / 1024" | bc -l 2>/dev/null || echo "0") ;;
+                        M) dl_mib="$num" ;;
+                        G) dl_mib=$(echo "$num * 1024" | bc -l 2>/dev/null || echo "0") ;;
+                        *) dl_mib=$(echo "$num / 1048576" | bc -l 2>/dev/null || echo "0") ;;
+                    esac
+                    dl_mib=$(printf "%.0f" "$dl_mib" 2>/dev/null || echo "0")
                 fi
                 
-                # Second line with ETA, Speed, and Location
+                # Parse total bytes
+                if [[ "$total_bytes" =~ ^([0-9.]+)([KMG])?i?B$ ]]; then
+                    num="${BASH_REMATCH[1]}"
+                    unit="${BASH_REMATCH[2]:-B}"
+                    case "$unit" in
+                        K) tot_mib=$(echo "$num / 1024" | bc -l 2>/dev/null || echo "0") ;;
+                        M) tot_mib="$num" ;;
+                        G) tot_mib=$(echo "$num * 1024" | bc -l 2>/dev/null || echo "0") ;;
+                        *) tot_mib=$(echo "$num / 1048576" | bc -l 2>/dev/null || echo "0") ;;
+                    esac
+                    tot_mib=$(printf "%.0f" "$tot_mib" 2>/dev/null || echo "0")
+                fi
+                
+                # Create progress bar
+                filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+                bar=$(printf '█%.0s' $(seq 1 "$filled"))
+                empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+                full_bar="$bar$empty"
+                
+                # Update progress display
+                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                if [ "$percent_int" -ge 99 ]; then
+                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
+                        "$full_bar" "100.0%" "$dl_mib" "$tot_mib"
+                else
+                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
+                        "$full_bar" "$percent" "$dl_mib" "$tot_mib"
+                fi
+                
+                # Update ETA and Speed line
                 printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
                 printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
                     "$eta" "$speed" "$DISPLAY_LOCATION"
