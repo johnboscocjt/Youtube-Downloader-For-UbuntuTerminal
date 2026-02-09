@@ -424,9 +424,13 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
 
-# === FIXED yt-dlp COMMAND WITH GREEN PROGRESS BAR ===
+# === FIXED yt-dlp COMMAND WITH PROGRESS BAR ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
+    # Create a temporary file to capture progress
+    TEMP_LOG=$(mktemp)
+    
+    # Run yt-dlp and capture output
     if yt-dlp \
         $PLAYLIST_FLAG \
         $MP3_FLAGS \
@@ -440,11 +444,11 @@ for ATTEMPT in 1 2 3; do
         --no-overwrites \
         --merge-output-format mp4 \
         $ARCHIVE_FLAG \
+        --progress \
         --newline \
         --no-warnings \
-        --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
         --output-na-placeholder "-" \
-        "$URL" 2>&1 | while IFS= read -r line; do
+        "$URL" 2>&1 | tee "$TEMP_LOG" | while IFS= read -r line; do
         
         # Handle metadata lines - Color them!
         if [[ "$line" =~ ^\[ ]]; then
@@ -467,6 +471,9 @@ for ATTEMPT in 1 2 3; do
             elif [[ "$line" =~ ^\[info\].*Downloading.*format ]]; then
                 # Format info
                 echo -e "${LIME}$line${RESET}"
+            elif [[ "$line" =~ ^\[download\].*Destination: ]]; then
+                # File destination
+                echo -e "${BRIGHT_BLUE}$line${RESET}"
             elif [[ "$line" =~ ^\[download\] ]]; then
                 # Generic download messages
                 echo -e "${BRIGHT_BLUE}$line${RESET}"
@@ -486,128 +493,69 @@ for ATTEMPT in 1 2 3; do
             continue
         fi
         
-        # Initialize variables
-        percent=""
-        downloaded_num=0
-        total_num=0
-        dl_display=""
-        tot_display=""
-        eta=""
-        speed=""
-        
-        # Parse progress line - Simple approach
-        if [[ "$line" =~ download: ]]; then
-            # Extract percentage
-            if [[ "$line" =~ ([0-9]+\.[0-9]+)% ]]; then
-                percent="${BASH_REMATCH[1]}%"
-                percent_val="${BASH_REMATCH[1]}"
-            elif [[ "$line" =~ ([0-9]+)% ]]; then
-                percent="${BASH_REMATCH[1]}%"
-                percent_val="${BASH_REMATCH[1]}"
-            fi
+        # Parse progress line - Show progress bar for downloading and merging
+        if [[ "$line" =~ ([0-9.]+)%[[:space:]]+of[[:space:]]+([0-9.]+)([KMGT]?iB)[[:space:]]+at[[:space:]]+([0-9.]+)([KMGT]?iB/s)[[:space:]]+ETA[[:space:]]+([0-9:]+) ]]; then
+            # Format: 12.3% of 45.6MiB at 1.23MiB/s ETA 00:12
+            percent="${BASH_REMATCH[1]}"
+            total="${BASH_REMATCH[2]}${BASH_REMATCH[3]}"
+            speed="${BASH_REMATCH[4]}${BASH_REMATCH[5]}"
+            eta="${BASH_REMATCH[6]}"
             
-            # Extract downloaded and total with units
-            if [[ "$line" =~ ([0-9]+\.[0-9]+)([KMGT]?iB)/([0-9]+\.[0-9]+)([KMGT]?iB) ]]; then
-                # Video format with units
-                dl_display="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
-                tot_display="${BASH_REMATCH[3]}${BASH_REMATCH[4]}"
-            elif [[ "$line" =~ ([0-9]+)\ ([0-9]+) ]]; then
-                # Audio format (bytes)
-                downloaded_num="${BASH_REMATCH[1]}"
-                total_num="${BASH_REMATCH[2]}"
-            fi
+            percent_int=${percent%.*}
+            filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+            bar=$(printf '█%.0s' $(seq 1 "$filled"))
+            empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+            full_bar="$bar$empty"
             
-            # Extract ETA
-            if [[ "$line" =~ ([0-9]+:[0-9]+) ]]; then
-                eta="${BASH_REMATCH[1]}"
-            fi
-            
-            # Extract speed
-            if [[ "$line" =~ ([0-9]+\.[0-9]+[KMGT]?iB/s) ]]; then
-                speed="${BASH_REMATCH[1]}"
-            fi
-        fi
-        
-        if [[ -n "$percent" ]]; then
-            percent_int=${percent_val%.*}
-            
-            if [ "$percent_int" -ge 99 ]; then
-                full_bar=$(printf '█%.0s' $(seq 1 $BAR_WIDTH))
-                percent_display="100.0%"
-                
-                # Show units for video, MiB for audio
-                if [[ -n "$dl_display" && -n "$tot_display" ]]; then
-                    # Video with units
-                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%s/%s]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
-                        "$full_bar" "$percent_display" "$dl_display" "$tot_display"
-                elif [[ "$total_num" -gt 0 ]]; then
-                    # Audio with calculated MiB
-                    dl_mib=$(( total_num / 1048576 ))
-                    tot_mib=$(( total_num / 1048576 ))
-                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
-                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
-                else
-                    # Unknown size
-                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[?/?]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
-                        "$full_bar" "$percent_display"
-                fi
-            else
-                filled=$(( (percent_int * BAR_WIDTH) / 100 ))
-                bar=$(printf '█%.0s' $(seq 1 "$filled"))
-                empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
-                full_bar="$bar$empty"
-                percent_display="$percent"
-                
-                # Show units for video, MiB for audio
-                if [[ -n "$dl_display" && -n "$tot_display" ]]; then
-                    # Video with units
-                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%s/%s]${RESET}" \
-                        "$full_bar" "$percent_display" "$dl_display" "$tot_display"
-                elif [[ "$total_num" -gt 0 ]]; then
-                    # Audio with calculated MiB
-                    dl_mib=$(( downloaded_num / 1048576 ))
-                    tot_mib=$(( total_num / 1048576 ))
-                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
-                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
-                else
-                    # Unknown size
-                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[?/?]${RESET}" \
-                        "$full_bar" "$percent_display"
-                fi
-            fi
-            
-            # Second line with ETA, Speed, and Location
-            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
-            printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
-                "${eta:---:--}" "${speed:-?}" "$DISPLAY_LOCATION"
-            
-            sleep 0.3
-        fi
-        
-        # Post-processing detection
-        if [[ "$line" =~ \[ExtractAudio\] || "$line" =~ Destination:.*\.mp3 ]] || [[ "$line" =~ \[Merger\] ]]; then
             printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-            if [[ "$IS_MP3" == "true" ]]; then
-                printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - converting to MP3..."
-            else
-                printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - merging audio/video..."
-            fi
+            printf "Downloading: ${GREEN}%s${RESET} %6.1f%% ${BRIGHT_BLUE}[%s]${RESET}" \
+                "$full_bar" "$percent" "$total"
+            
             printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
-            printf "Post-processing in progress... please wait"
+            printf "Speed: ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
+                "$speed" "$eta" "$DISPLAY_LOCATION"
+                
+        elif [[ "$line" =~ ([0-9.]+)%[[:space:]]+of[[:space:]]+([0-9.]+)([KMGT]?iB)[[:space:]]+in[[:space:]]+([0-9:]+) ]]; then
+            # Format: 12.3% of 45.6MiB in 00:12
+            percent="${BASH_REMATCH[1]}"
+            total="${BASH_REMATCH[2]}${BASH_REMATCH[3]}"
+            eta="${BASH_REMATCH[4]}"
+            
+            percent_int=${percent%.*}
+            filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+            bar=$(printf '█%.0s' $(seq 1 "$filled"))
+            empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+            full_bar="$bar$empty"
+            
+            printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "Downloading: ${GREEN}%s${RESET} %6.1f%% ${BRIGHT_BLUE}[%s]${RESET}" \
+                "$full_bar" "$percent" "$total"
+            
+            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "ETA: ${YELLOW}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
+                "$eta" "$DISPLAY_LOCATION"
+                
+        elif [[ "$line" =~ Merging\ formats ]]; then
+            printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - merging audio/video..."
+            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "Merging audio and video... please wait"
+            
+        elif [[ "$line" =~ Extracting\ audio ]]; then
+            printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - converting to MP3..."
+            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "Converting to MP3... please wait"
         fi
         
     done; then
         DOWNLOAD_SUCCESS=true
+        rm -f "$TEMP_LOG"
         break
     else
-        echo ""
+        rm -f "$TEMP_LOG"
         if [[ $ATTEMPT -lt 3 ]]; then
+            echo ""
             print_error "⚠️  Attempt $ATTEMPT failed. Refreshing cookies..."
             pkill -f "chrome" 2>/dev/null || true
             sleep 3
@@ -618,6 +566,8 @@ for ATTEMPT in 1 2 3; do
             wait $CHROME_PID 2>/dev/null || true
             echo -e "${SKY_BLUE}🔄 Retrying (attempt $((ATTEMPT + 1))...${RESET}"
             sleep 2
+        else
+            DOWNLOAD_SUCCESS=false
         fi
     fi
 done
@@ -625,7 +575,15 @@ done
 # Show cursor again
 echo -e "${SHOW_CURSOR}"
 
-if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
+# Show completion message
+if [[ "$DOWNLOAD_SUCCESS" == true ]]; then
+    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+    printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET}"
+    printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+    printf "${BRIGHT_GREEN}✅ Download completed successfully!${RESET}"
+    echo ""
+    echo ""
+else
     echo ""
     echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
     print_error "❌ DOWNLOAD FAILED AFTER 3 ATTEMPTS"
@@ -636,7 +594,6 @@ if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     echo -e "     3. Reconnect and retry"
     exit 1
 fi
-
 
 # === PERFECTLY ALIGNED COMPLETION BOX ===
 echo ""
