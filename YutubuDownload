@@ -311,7 +311,7 @@ if [[ "$IS_PLAYLIST" == "true" ]]; then
     echo "   Prevents mixing files from playlists with identical names"
     echo -n -e "   ${BRIGHT_CYAN}y${RESET} = Yes (safe default) | ${BRIGHT_CYAN}n${RESET} = No [default=y]: "
     read -r FOLDER_CHOICE || FOLDER_CHOICE="y"
-    FOLDER_CHOICE="${FOLDER_CHOICE:-y}"
+    FOLDER_CHOICE="${FOLDER_CHOICE}:-y}"
     FOLDER_CHOICE=$(echo "$FOLDER_CHOICE" | xargs | tr '[:upper:]' '[:lower:]')
     
     if [[ "${FOLDER_CHOICE}" == "y" || "${FOLDER_CHOICE}" == "" ]]; then
