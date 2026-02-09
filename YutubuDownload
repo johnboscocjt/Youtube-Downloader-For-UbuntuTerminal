@@ -347,10 +347,18 @@ echo ""
 
 # Archive handling
 VIDEO_ID=""
+VIDEO_TITLE=""
 if [[ "$URL" =~ (?:v=|youtu\.be/)([^&?/]{11}) ]]; then
     VIDEO_ID="${BASH_REMATCH[1]}"
 elif [[ "$URL" =~ youtube\.com/embed/([^/?&]{11}) ]]; then
     VIDEO_ID="${BASH_REMATCH[1]}"
+fi
+
+# Try to get video title for better display
+if [[ -n "$VIDEO_ID" ]]; then
+    VIDEO_TITLE=$(timeout 10 yt-dlp --get-title "$VIDEO_ID" 2>/dev/null || echo "Unknown Title")
+    # Clean up title (remove problematic characters)
+    VIDEO_TITLE=$(echo "$VIDEO_TITLE" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 50)
 fi
 
 ARCHIVE_FILE="$HOME/yt-downloads-archive.txt"
@@ -372,6 +380,7 @@ else
             echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
             echo ""
             echo -e "   ${CYAN}Video ID:${RESET} $VIDEO_ID"
+            echo -e "   ${CYAN}Video Title:${RESET} $VIDEO_TITLE"
             echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
             echo -e "   ${ORANGE}⚠️  Archive tracking prevents duplicate downloads${RESET}"
             echo ""
@@ -386,11 +395,11 @@ else
             if [[ "$CHOICE" == "y" ]]; then
                 grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
                 mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-                echo -e "${LIME}✅ DELETED $VIDEO_ID from archive. Proceeding with fresh download...${RESET}"
+                echo -e "${LIME}✅ DELETED '$VIDEO_TITLE' from archive. Proceeding with fresh download...${RESET}"
                 echo ""
                 ARCHIVE_FLAG=""
             else
-                echo -e "${LIME}✅ SKIPPED download per your choice.${RESET}"
+                echo -e "${LIME}✅ SKIPPED '$VIDEO_TITLE' per your choice.${RESET}"
                 echo -e "${CYAN}   To force download next time, use:${RESET}"
                 echo -e "${CYAN}   ./YutubuDownload --force-download${RESET}"
                 exit 0
@@ -436,9 +445,11 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
 
-# === SIMPLE, WORKING DOWNLOAD LOGIC ===
+# === FIXED DOWNLOAD LOGIC WITH BETTER PROGRESS ===
 DOWNLOAD_SUCCESS=false
 ANY_VIDEO_DOWNLOADED=false
+CURRENT_VIDEO_TITLE=""
+CURRENT_VIDEO_ID=""
 
 for ATTEMPT in 1 2 3; do
     # Initialize variables for this attempt
@@ -461,12 +472,32 @@ for ATTEMPT in 1 2 3; do
         --no-warnings \
         --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
         --output-na-placeholder "-" \
+        --print-to-file "title:%(title)s" "/tmp/current_video.txt" \
+        --print-to-file "id:%(id)s" "/tmp/current_id.txt" \
         "$URL" 2>&1 | while IFS= read -r line; do
         
-        # Handle "already recorded in archive" messages - SIMPLE VERSION
+        # Update current video info
+        if [[ -f "/tmp/current_video.txt" ]]; then
+            CURRENT_VIDEO_TITLE=$(head -n1 /tmp/current_video.txt 2>/dev/null | sed 's/title://' || echo "")
+            # Clean title for display
+            CURRENT_VIDEO_TITLE=$(echo "$CURRENT_VIDEO_TITLE" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 40)
+        fi
+        
+        if [[ -f "/tmp/current_id.txt" ]]; then
+            CURRENT_VIDEO_ID=$(head -n1 /tmp/current_id.txt 2>/dev/null | sed 's/id://' || echo "")
+        fi
+        
+        # Handle "already recorded in archive" messages
         if [[ "$line" =~ "has already been recorded in the archive" ]]; then
             if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
                 FOUND_VIDEO_ID="${BASH_REMATCH[1]}"
+                
+                # Try to get the video title
+                FOUND_VIDEO_TITLE=""
+                if [[ -n "$FOUND_VIDEO_ID" ]]; then
+                    FOUND_VIDEO_TITLE=$(timeout 5 yt-dlp --get-title "$FOUND_VIDEO_ID" 2>/dev/null || echo "Unknown Title")
+                    FOUND_VIDEO_TITLE=$(echo "$FOUND_VIDEO_TITLE" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 50)
+                fi
                 
                 echo ""
                 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
@@ -474,6 +505,7 @@ for ATTEMPT in 1 2 3; do
                 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
                 echo ""
                 echo -e "   ${CYAN}Video ID:${RESET} $FOUND_VIDEO_ID"
+                echo -e "   ${CYAN}Video Title:${RESET} $FOUND_VIDEO_TITLE"
                 echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
                 echo ""
                 
@@ -491,7 +523,7 @@ for ATTEMPT in 1 2 3; do
                         r)
                             grep -vxF "$FOUND_VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
                             mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-                            echo -e "${LIME}✅ REMOVED $FOUND_VIDEO_ID from archive${RESET}"
+                            echo -e "${LIME}✅ REMOVED '$FOUND_VIDEO_TITLE' from archive${RESET}"
                             echo -e "${SKY_BLUE}🔄 This video will be downloaded NOW${RESET}"
                             echo ""
                             # Just continue - yt-dlp will retry this video
@@ -502,7 +534,7 @@ for ATTEMPT in 1 2 3; do
                             exit 0
                             ;;
                         *)
-                            echo -e "${LIME}✅ SKIPPING $FOUND_VIDEO_ID (continuing with playlist)${RESET}"
+                            echo -e "${LIME}✅ SKIPPING '$FOUND_VIDEO_TITLE' (continuing with playlist)${RESET}"
                             echo ""
                             SKIP_VIDEO_ID="$FOUND_VIDEO_ID"
                             ;;
@@ -520,12 +552,12 @@ for ATTEMPT in 1 2 3; do
                     if [[ "$CHOICE" == "r" ]]; then
                         grep -vxF "$FOUND_VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
                         mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-                        echo -e "${LIME}✅ REMOVED $FOUND_VIDEO_ID from archive${RESET}"
+                        echo -e "${LIME}✅ REMOVED '$FOUND_VIDEO_TITLE' from archive${RESET}"
                         echo -e "${SKY_BLUE}🔄 Continuing with download...${RESET}"
                         echo ""
                         # Continue - yt-dlp will retry
                     else
-                        echo -e "${LIME}✅ SKIPPED download per your choice${RESET}"
+                        echo -e "${LIME}✅ SKIPPED '$FOUND_VIDEO_TITLE' per your choice${RESET}"
                         echo -e "${SHOW_CURSOR}"
                         exit 0
                     fi
@@ -547,7 +579,10 @@ for ATTEMPT in 1 2 3; do
         
         # Handle metadata lines
         if [[ "$line" =~ ^\[ ]]; then
-            echo -e "${CYAN}$line${RESET}"
+            # Don't echo metadata lines that interfere with progress
+            if [[ ! "$line" =~ \[download\]\ [0-9] ]]; then
+                echo -e "${CYAN}$line${RESET}"
+            fi
             continue
         fi
         
@@ -578,21 +613,24 @@ for ATTEMPT in 1 2 3; do
                 empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
                 full_bar="$bar$empty"
                 
+                # Display title or ID
+                DISPLAY_NAME="${CURRENT_VIDEO_TITLE:-${CURRENT_VIDEO_ID:-Downloading...}}"
+                
                 if [ "$percent_int" -ge 99 ]; then
                     percent_display="100.0%"
                     printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
                     printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
                         "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+                    printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Video: ${MAGENTA}%s${RESET}" "$DISPLAY_NAME"
                 else
                     printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
                     printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
                         "$full_bar" "$percent" "$dl_mib" "$tot_mib"
+                    printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Video: ${MAGENTA}%s${RESET} | ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET}" \
+                        "$DISPLAY_NAME" "$eta" "$speed"
                 fi
-                
-                # Second line with ETA, Speed, and Location
-                printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
-                printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
-                    "$eta" "$speed" "$DISPLAY_LOCATION"
                 
                 sleep 0.1
             fi
@@ -629,6 +667,9 @@ for ATTEMPT in 1 2 3; do
         fi
     fi
 done
+
+# Clean up temp files
+rm -f "/tmp/current_video.txt" "/tmp/current_id.txt" 2>/dev/null || true
 
 # Show cursor again
 echo -e "${SHOW_CURSOR}"
