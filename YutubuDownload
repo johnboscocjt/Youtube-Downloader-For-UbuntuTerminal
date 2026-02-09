@@ -486,41 +486,103 @@ for ATTEMPT in 1 2 3; do
             continue
         fi
         
-        # Parse progress line
-        read -r downloaded total percent eta speed <<< "$line"
+        # Parse progress line - Handle video format (with KiB/MiB units) and audio format (bytes only)
+        if [[ "$line" =~ download:([0-9]+)\ ([0-9]+)\ ([0-9.]+)%\ ([0-9:]+)\ ([0-9.]+\ ?[KMGT]?iB/s) ]]; then
+            # Audio format (bytes)
+            downloaded="${BASH_REMATCH[1]}"
+            total="${BASH_REMATCH[2]}"
+            percent="${BASH_REMATCH[3]}%"
+            eta="${BASH_REMATCH[4]}"
+            speed="${BASH_REMATCH[5]}"
+            
+            downloaded_num="$downloaded"
+            total_num="$total"
+            percent_val="${BASH_REMATCH[3]}"
+            
+        elif [[ "$line" =~ download:([0-9.]+)([KMGT]?iB)/([0-9.]+)([KMGT]?iB)\ *([0-9.]+)%\ ([0-9:]+)\ ([0-9.]+\ ?[KMGT]?iB/s) ]]; then
+            # Video format with units
+            downloaded="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
+            total="${BASH_REMATCH[3]}${BASH_REMATCH[4]}"
+            percent="${BASH_REMATCH[5]}%"
+            eta="${BASH_REMATCH[6]}"
+            speed="${BASH_REMATCH[7]}"
+            
+            # Convert units to bytes for calculation
+            case "${BASH_REMATCH[2]}" in
+                "KiB") downloaded_num=$(echo "${BASH_REMATCH[1]} * 1024" | bc | cut -d. -f1) ;;
+                "MiB") downloaded_num=$(echo "${BASH_REMATCH[1]} * 1048576" | bc | cut -d. -f1) ;;
+                "GiB") downloaded_num=$(echo "${BASH_REMATCH[1]} * 1073741824" | bc | cut -d. -f1) ;;
+                "TiB") downloaded_num=$(echo "${BASH_REMATCH[1]} * 1099511627776" | bc | cut -d. -f1) ;;
+                *) downloaded_num="${BASH_REMATCH[1]}" ;;
+            esac
+            
+            case "${BASH_REMATCH[4]}" in
+                "KiB") total_num=$(echo "${BASH_REMATCH[3]} * 1024" | bc | cut -d. -f1) ;;
+                "MiB") total_num=$(echo "${BASH_REMATCH[3]} * 1048576" | bc | cut -d. -f1) ;;
+                "GiB") total_num=$(echo "${BASH_REMATCH[3]} * 1073741824" | bc | cut -d. -f1) ;;
+                "TiB") total_num=$(echo "${BASH_REMATCH[3]} * 1099511627776" | bc | cut -d. -f1) ;;
+                *) total_num="${BASH_REMATCH[3]}" ;;
+            esac
+            
+            percent_val="${BASH_REMATCH[5]}"
+            
+            # Use units in display for video
+            dl_display="$downloaded"
+            tot_display="$total"
+        fi
         
         if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
-            percent_int="${BASH_REMATCH[1]}"
+            percent_int="${percent_val%.*}"
+            
             if [ "$percent_int" -ge 99 ]; then
                 full_bar=$(printf '█%.0s' $(seq 1 $BAR_WIDTH))
                 percent_display="100.0%"
-                if [ "$total" -gt 0 ]; then
-                    dl_mib=$(( total / 1048576 ))
-                    tot_mib=$(( total / 1048576 ))
+                
+                # Show units for video, MiB for audio
+                if [[ -n "$dl_display" && -n "$tot_display" ]]; then
+                    # Video with units
+                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%s/%s]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
+                        "$full_bar" "$percent_display" "$dl_display" "$tot_display"
+                elif [[ "$total_num" =~ ^[0-9]+$ ]] && [ "$total_num" -gt 0 ]; then
+                    # Audio with calculated MiB
+                    dl_mib=$(( total_num / 1048576 ))
+                    tot_mib=$(( total_num / 1048576 ))
+                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
+                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
                 else
-                    dl_mib=0
-                    tot_mib=0
+                    # Unknown size
+                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[?/?]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
+                        "$full_bar" "$percent_display"
                 fi
-                # Use green status directly in printf
-                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
-                    "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
             else
                 filled=$(( (percent_int * BAR_WIDTH) / 100 ))
                 bar=$(printf '█%.0s' $(seq 1 "$filled"))
                 empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
                 full_bar="$bar$empty"
                 percent_display="$percent"
-                if [ "$total" -gt 0 ]; then
-                    dl_mib=$(( downloaded / 1048576 ))
-                    tot_mib=$(( total / 1048576 ))
+                
+                # Show units for video, MiB for audio
+                if [[ -n "$dl_display" && -n "$tot_display" ]]; then
+                    # Video with units
+                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%s/%s]${RESET}" \
+                        "$full_bar" "$percent_display" "$dl_display" "$tot_display"
+                elif [[ "$total_num" =~ ^[0-9]+$ ]] && [ "$total_num" -gt 0 ]; then
+                    # Audio with calculated MiB
+                    dl_mib=$(( downloaded_num / 1048576 ))
+                    tot_mib=$(( total_num / 1048576 ))
+                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
+                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
                 else
-                    dl_mib=0
-                    tot_mib=0
+                    # Unknown size
+                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[?/?]${RESET}" \
+                        "$full_bar" "$percent_display"
                 fi
-                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
-                    "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
             fi
             
             # Second line with ETA, Speed, and Location
@@ -529,6 +591,10 @@ for ATTEMPT in 1 2 3; do
                 "$eta" "$speed" "$DISPLAY_LOCATION"
             
             sleep 0.3
+            
+            # Reset display variables
+            dl_display=""
+            tot_display=""
         fi
         
         # Post-processing detection
