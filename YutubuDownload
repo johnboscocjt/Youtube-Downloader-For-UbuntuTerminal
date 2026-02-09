@@ -441,8 +441,8 @@ DOWNLOAD_SUCCESS=false
 ANY_VIDEO_DOWNLOADED=false
 
 for ATTEMPT in 1 2 3; do
-    # Clear any previous archive decisions
-    unset SKIP_VIDEO_ID 2>/dev/null || true
+    # Initialize variables for this attempt
+    SKIP_VIDEO_ID=""
     
     if yt-dlp \
         $PLAYLIST_FLAG \
@@ -466,14 +466,14 @@ for ATTEMPT in 1 2 3; do
         # Handle "already recorded in archive" messages - SIMPLE VERSION
         if [[ "$line" =~ "has already been recorded in the archive" ]]; then
             if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
-                VIDEO_ID="${BASH_REMATCH[1]}"
+                FOUND_VIDEO_ID="${BASH_REMATCH[1]}"
                 
                 echo ""
                 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
                 echo -e "${ORANGE}⚠️  VIDEO ALREADY IN ARCHIVE DETECTED  ⚠️${RESET}"
                 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
                 echo ""
-                echo -e "   ${CYAN}Video ID:${RESET} $VIDEO_ID"
+                echo -e "   ${CYAN}Video ID:${RESET} $FOUND_VIDEO_ID"
                 echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
                 echo ""
                 
@@ -489,9 +489,9 @@ for ATTEMPT in 1 2 3; do
                     
                     case "$CHOICE" in
                         r)
-                            grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                            grep -vxF "$FOUND_VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
                             mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-                            echo -e "${LIME}✅ REMOVED $VIDEO_ID from archive${RESET}"
+                            echo -e "${LIME}✅ REMOVED $FOUND_VIDEO_ID from archive${RESET}"
                             echo -e "${SKY_BLUE}🔄 This video will be downloaded NOW${RESET}"
                             echo ""
                             # Just continue - yt-dlp will retry this video
@@ -502,9 +502,9 @@ for ATTEMPT in 1 2 3; do
                             exit 0
                             ;;
                         *)
-                            echo -e "${LIME}✅ SKIPPING $VIDEO_ID (continuing with playlist)${RESET}"
+                            echo -e "${LIME}✅ SKIPPING $FOUND_VIDEO_ID (continuing with playlist)${RESET}"
                             echo ""
-                            SKIP_VIDEO_ID="$VIDEO_ID"
+                            SKIP_VIDEO_ID="$FOUND_VIDEO_ID"
                             ;;
                     esac
                 else
@@ -518,9 +518,9 @@ for ATTEMPT in 1 2 3; do
                     echo ""
                     
                     if [[ "$CHOICE" == "r" ]]; then
-                        grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                        grep -vxF "$FOUND_VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
                         mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-                        echo -e "${LIME}✅ REMOVED $VIDEO_ID from archive${RESET}"
+                        echo -e "${LIME}✅ REMOVED $FOUND_VIDEO_ID from archive${RESET}"
                         echo -e "${SKY_BLUE}🔄 Continuing with download...${RESET}"
                         echo ""
                         # Continue - yt-dlp will retry
@@ -536,7 +536,7 @@ for ATTEMPT in 1 2 3; do
         fi
         
         # Skip lines for skipped videos in playlist
-        if [[ -n "$SKIP_VIDEO_ID" ]] && [[ "$line" =~ \[download\].*$SKIP_VIDEO_ID ]]; then
+        if [[ -n "${SKIP_VIDEO_ID:-}" ]] && [[ "$line" =~ \[download\].*$SKIP_VIDEO_ID ]]; then
             continue
         fi
         
@@ -656,6 +656,16 @@ if [[ "$ANY_VIDEO_DOWNLOADED" == "true" ]] || [[ "$DOWNLOAD_SUCCESS" == true ]];
     echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
     echo -e "${BRIGHT_GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${RESET}"
     echo ""
+elif [[ "$DOWNLOAD_SUCCESS" == false ]]; then
+    echo ""
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    print_error "❌ DOWNLOAD FAILED AFTER 3 ATTEMPTS"
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    echo -e "${CYAN}   💡 TANZANIA FIX:${RESET}"
+    echo -e "     1. Disconnect WiFi/Ethernet"
+    echo -e "     2. Wait 10 seconds"
+    echo -e "     3. Reconnect and retry"
+    exit 1
 fi
 
 # Signature
