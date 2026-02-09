@@ -87,8 +87,10 @@ get_video_title() {
     local title=""
     
     if [[ -n "$video_id" ]]; then
-        title=$(timeout 10 yt-dlp --get-title "https://youtu.be/$video_id" 2>/dev/null || echo "Unknown Title")
+        # Use cookies for better success rate
+        title=$(timeout 15 yt-dlp --cookies-from-browser chrome --get-title "https://youtu.be/$video_id" 2>/dev/null | head -n1 || echo "Unknown Title")
         title=$(echo "$title" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 80)
+        [[ -z "$title" || "$title" == "Unknown Title" ]] && title="[Title Unavailable - Requires Login]"
     fi
     
     echo "$title"
@@ -100,13 +102,32 @@ process_playlist_archive() {
     local archive_file="$2"
     
     echo -e "${SKY_BLUE}🔄 Analyzing playlist for archived videos...${RESET}"
+    echo -e "${CYAN}This may take a moment depending on playlist size...${RESET}"
     
-    # Get all video IDs in the playlist
+    # Get all video IDs in the playlist WITH COOKIES
+    echo -e "${SKY_BLUE}Fetching playlist data (with authentication)...${RESET}"
+    
     local all_video_ids
-    all_video_ids=$(timeout 30 yt-dlp --yes-playlist --get-id "$url" 2>/dev/null | head -n 50)
+    all_video_ids=$(timeout 45 yt-dlp \
+        --cookies-from-browser chrome \
+        --yes-playlist \
+        --get-id \
+        --quiet \
+        "$url" 2>/dev/null | head -n 100)
     
     if [[ -z "$all_video_ids" ]]; then
-        echo -e "${ORANGE}⚠️  Could not fetch playlist info. Proceeding normally.${RESET}"
+        echo -e "${ORANGE}⚠️  Could not fetch playlist info. Trying without authentication...${RESET}"
+        # Try without cookies as fallback
+        all_video_ids=$(timeout 30 yt-dlp \
+            --yes-playlist \
+            --get-id \
+            --quiet \
+            "$url" 2>/dev/null | head -n 50)
+    fi
+    
+    if [[ -z "$all_video_ids" ]]; then
+        echo -e "${ORANGE}⚠️  Could not fetch playlist info. Will proceed with normal download.${RESET}"
+        echo -e "${CYAN}Tip: Some playlists require login to view.${RESET}"
         return
     fi
     
@@ -116,13 +137,21 @@ process_playlist_archive() {
     
     # Check archive for each video
     local archived_videos=()
+    local index=1
+    
+    echo -e "${SKY_BLUE}Checking archive...${RESET}"
+    
     while IFS= read -r video_id; do
         [[ -z "$video_id" ]] && continue
         
         if grep -qxF "$video_id" "$archive_file" 2>/dev/null; then
             archived_videos+=("$video_id")
+            echo -ne "${CYAN}Found archived video $index...${RESET}\r"
         fi
+        ((index++))
     done <<< "$all_video_ids"
+    
+    echo -e "${CLEAR_LINE}${GOTO_COL1}${LIME}✅ Archive check complete${RESET}"
     
     local archived_count=${#archived_videos[@]}
     
@@ -141,11 +170,16 @@ process_playlist_archive() {
     local videos_to_keep=()
     local index=1
     
+    echo -e "${CYAN}Processing archived videos...${RESET}"
+    echo ""
+    
     for video_id in "${archived_videos[@]}"; do
         local video_title
+        echo -ne "${SKY_BLUE}Getting title for video $index of $archived_count...${RESET}\r"
         video_title=$(get_video_title "$video_id")
+        echo -e "${CLEAR_LINE}${GOTO_COL1}"
         
-        echo -e "\n${BRIGHT_BLUE}Video $index of $archived_count:${RESET}"
+        echo -e "${BRIGHT_BLUE}Video $index of $archived_count:${RESET}"
         echo -e "  ${CYAN}ID:${RESET} $video_id"
         echo -e "  ${CYAN}Title:${RESET} $video_title"
         echo ""
@@ -153,7 +187,8 @@ process_playlist_archive() {
         echo -e "    ${BRIGHT_GREEN}r${RESET} = RE-DOWNLOAD (remove from archive)"
         echo -e "    ${BRIGHT_BLUE}s${RESET} = SKIP (keep in archive)"
         echo -e "    ${BRIGHT_YELLOW}a${RESET} = Apply to ALL remaining videos"
-        echo -n -e "  ${BRIGHT_CYAN}Your choice (r/s/a) [default=s]: ${RESET}"
+        echo -e "    ${BRIGHT_RED}x${RESET} = Skip ALL remaining (keep all in archive)"
+        echo -n -e "  ${BRIGHT_CYAN}Your choice (r/s/a/x) [default=s]: ${RESET}"
         
         read -r choice
         choice=$(echo "${choice:-s}" | tr '[:upper:]' '[:lower:]')
@@ -182,12 +217,21 @@ process_playlist_archive() {
                 fi
                 break
                 ;;
+            x)
+                # Skip all remaining
+                for ((j=index-1; j<archived_count; j++)); do
+                    videos_to_keep+=("${archived_videos[$j]}")
+                done
+                echo -e "  ${LIME}✅ Will SKIP ALL remaining videos${RESET}"
+                break
+                ;;
             *)
                 videos_to_keep+=("$video_id")
                 echo -e "  ${LIME}✅ Will skip '$video_title'${RESET}"
                 ;;
         esac
         
+        echo ""
         ((index++))
     done
     
@@ -197,11 +241,11 @@ process_playlist_archive() {
         
         # Create temp archive without removed videos
         local temp_archive="${archive_file}.temp"
-        cp "$archive_file" "$temp_archive" 2>/dev/null || true
+        cp "$archive_file" "$temp_archive" 2>/dev/null || touch "$temp_archive"
         
         for video_id in "${videos_to_remove[@]}"; do
             grep -vxF "$video_id" "$temp_archive" > "${temp_archive}.tmp" 2>/dev/null || true
-            mv "${temp_archive}.tmp" "$temp_archive" 2>/dev/null || true
+            [[ -f "${temp_archive}.tmp" ]] && mv "${temp_archive}.tmp" "$temp_archive"
         done
         
         mv "$temp_archive" "$archive_file" 2>/dev/null || true
@@ -211,7 +255,7 @@ process_playlist_archive() {
     echo -e "\n${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
     echo -e "${BRIGHT_CYAN}📊 DOWNLOAD SUMMARY${RESET}"
     echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-    echo -e "${CYAN}Total videos:${RESET} $video_count"
+    echo -e "${CYAN}Total videos in playlist:${RESET} $video_count"
     echo -e "${CYAN}Will download:${RESET} $((video_count - ${#videos_to_keep[@]}))"
     echo -e "${CYAN}Will skip:${RESET} ${#videos_to_keep[@]}"
     echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
