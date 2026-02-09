@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.0.8 — Fixed local variable error
+# Version: 1.0.9 — Fixed pipeline variable scope
 
 set -euo pipefail
 
@@ -77,9 +77,51 @@ extract_video_id() {
     echo "$video_id"
 }
 
+# Function to display progress bar with title
+show_progress_bar() {
+    local percent="$1"
+    local current="$2"
+    local total="$3"
+    local eta="$4"
+    local speed="$5"
+    local title="$6"
+    local is_playlist="$7"
+    
+    local BAR_WIDTH=20
+    local percent_int=$(printf "%.0f" "$percent")
+    [ $percent_int -gt 100 ] && percent_int=100
+    [ $percent_int -lt 0 ] && percent_int=0
+    
+    local filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+    [ $filled -gt $BAR_WIDTH ] && filled=$BAR_WIDTH
+    local bar=$(printf '█%.0s' $(seq 1 "$filled"))
+    local empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+    
+    # Clear line and show progress with title
+    echo -ne "\r\033[K"
+    
+    # Truncate title if too long
+    local max_title_length=40
+    if [ ${#title} -gt $max_title_length ]; then
+        title="${title:0:$((max_title_length-3))}..."
+    fi
+    
+    if [[ "$is_playlist" == "true" ]] && [ "$total" != "1" ]; then
+        echo -ne "Item ${current}/${total}: ${BRIGHT_CYAN}${title}${RESET}"
+        echo -ne "\n${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
+        echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
+        echo -ne "\033[1A"  # Move cursor up 1 line
+    else
+        echo -ne "${BRIGHT_CYAN}${title}${RESET}"
+        echo -ne "\n${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
+        echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
+        echo -ne "\033[1A"  # Move cursor up 1 line
+    fi
+}
+
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.0.8 (2026-02-10) • Tanzania-Optimized • FIXED VARIABLE ERROR"
+    echo "YutubuDownload v1.0.9 (2026-02-10) • Tanzania-Optimized • FIXED SCOPE"
     exit 0
 fi
 
@@ -100,7 +142,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.8${RESET}"
+echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.9${RESET}"
 
 # === SMART COOKIE REFRESH (Tanzania-optimized) ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
@@ -348,47 +390,6 @@ echo -e "${CYAN}Resume/Skip:${RESET}   ${BRIGHT_GREEN}File-based (auto-resume & 
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
 
-# Function to display individual progress bar with title
-show_progress_bar() {
-    local percent="$1"
-    local current="$2"
-    local total="$3"
-    local eta="$4"
-    local speed="$5"
-    local title="$6"
-    
-    local BAR_WIDTH=20
-    local percent_int=$(printf "%.0f" "$percent")
-    [ $percent_int -gt 100 ] && percent_int=100
-    [ $percent_int -lt 0 ] && percent_int=0
-    
-    local filled=$(( (percent_int * BAR_WIDTH) / 100 ))
-    [ $filled -gt $BAR_WIDTH ] && filled=$BAR_WIDTH
-    local bar=$(printf '█%.0s' $(seq 1 "$filled"))
-    local empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
-    
-    # Clear line and show progress with title
-    echo -ne "\r\033[K"
-    
-    # Truncate title if too long
-    local max_title_length=40
-    if [ ${#title} -gt $max_title_length ]; then
-        title="${title:0:$((max_title_length-3))}..."
-    fi
-    
-    if [[ "$IS_PLAYLIST" == "true" ]] && [ "$total" != "1" ]; then
-        echo -ne "Item ${current}/${total}: ${BRIGHT_CYAN}${title}${RESET}"
-        echo -ne "\n${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
-        echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
-        echo -ne "\033[1A"  # Move cursor up 1 line
-    else
-        echo -ne "${BRIGHT_CYAN}${title}${RESET}"
-        echo -ne "\n${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
-        echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
-        echo -ne "\033[1A"  # Move cursor up 1 line
-    fi
-}
-
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
@@ -435,15 +436,9 @@ yt-dlp \
         continue
     fi
     
-    # Parse video title from yt-dlp info line
-    if [[ "$line" =~ ^\[youtube\].*Downloading\ +v[[:space:]]+([0-9]+)\ +of\ +([0-9]+) ]]; then
-        # This is a playlist item starting
-        continue
-    fi
-    
     # Parse video title when it starts downloading
     if [[ "$line" =~ ^\[download\]\ +Destination:\ +(.*)$ ]]; then
-        local dest="${BASH_REMATCH[1]}"
+        dest="${BASH_REMATCH[1]}"
         # Extract title from destination path
         if [[ "$dest" =~ /([^/]+)\.[^./]+$ ]]; then
             CURRENT_TITLE="${BASH_REMATCH[1]}"
@@ -470,14 +465,10 @@ yt-dlp \
         eta="${BASH_REMATCH[6]}"
         
         # Use current title or default
-        local display_title="${CURRENT_TITLE:-Downloading...}"
+        display_title="${CURRENT_TITLE:-Downloading...}"
         
         # Show individual progress bar with title
-        if [[ "$IS_PLAYLIST" == "true" ]] && [ $TOTAL_ITEMS -gt 0 ]; then
-            show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed" "$display_title"
-        else
-            show_progress_bar "$percent" "1" "1" "$eta" "$speed" "$display_title"
-        fi
+        show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed" "$display_title" "$IS_PLAYLIST"
         continue
     fi
     
@@ -492,7 +483,7 @@ yt-dlp \
     if ([[ "$line" =~ \[ExtractAudio\].*Destination: ]] || [[ "$line" =~ \[Merger\].*Merging.*into ]]) && ! $VIDEO_COMPLETE; then
         # Try to extract title from the line
         if [[ "$line" =~ \/([^/]+)\.[^./]+$ ]]; then
-            local file_title="${BASH_REMATCH[1]}"
+            file_title="${BASH_REMATCH[1]}"
             file_title=$(echo "$file_title" | sed -E 's/^[0-9]{2,} - //')
             echo -e "\r\033[K${BRIGHT_GREEN}✓ Processed:${RESET} ${BRIGHT_CYAN}${file_title}${RESET}"
         else
