@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.0.3 — Single progress bar fix
+# Version: 1.0.4 — Fixed progress bar display
 
 set -euo pipefail
 
@@ -79,7 +79,7 @@ extract_video_id() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.0.3 (2026-02-10) • Tanzania-Optimized • SINGLE PROGRESS BAR"
+    echo "YutubuDownload v1.0.4 (2026-02-10) • Tanzania-Optimized • FIXED PROGRESS BAR"
     exit 0
 fi
 
@@ -100,7 +100,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.3${RESET}"
+echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.4${RESET}"
 
 # === SMART COOKIE REFRESH (Tanzania-optimized) ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
@@ -348,7 +348,7 @@ echo -e "${CYAN}Resume/Skip:${RESET}   ${BRIGHT_GREEN}File-based (auto-resume & 
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
 
-# === SINGLE PROGRESS BAR SETUP ===
+# === SIMPLIFIED PROGRESS BAR SETUP ===
 BAR_WIDTH=20
 CSI="\033["
 HIDE_CURSOR="${CSI}?25l"
@@ -364,27 +364,18 @@ DISPLAY_LOCATION="${FOLDER_NAME:-Current directory}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-echo -e "${SKY_BLUE}Starting download... (single progress bar below)${RESET}"
+echo -e "${SKY_BLUE}Starting download...${RESET}"
 echo ""
 
-# === CORE yt-dlp COMMAND — NO ARCHIVE ===
+# === CORE yt-dlp COMMAND — WITH SIMPLE PROGRESS PARSING ===
 DOWNLOAD_SUCCESS=false
 CURRENT_ITEM=0
 TOTAL_ITEMS=0
 
-# Function to print metadata lines without interfering with progress bar
-print_metadata() {
-    local line="$1"
-    if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]] || \
-       [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]] || \
-       [[ "$line" =~ ^\[download\].*Downloading.*item.*of ]]; then
-        echo -e "${BRIGHT_CYAN}$line${RESET}"
-    elif [[ "$line" =~ ^\[info\] ]]; then
-        echo -e "${BLUE}$line${RESET}"
-    elif [[ "$line" =~ ^\[ExtractAudio\] ]] || [[ "$line" =~ ^\[Merger\] ]]; then
-        echo -e "${BRIGHT_GREEN}$line${RESET}"
-    fi
-}
+# Display initial progress bar
+echo -e "${CLEAR_LINE}${GOTO_COL1}Downloading: ${GREEN}░░░░░░░░░░░░░░░░░░░░${RESET} 0.0% [0MiB/0MiB]"
+echo -e "${CLEAR_LINE}${GOTO_COL1}ETA: ${YELLOW}-${RESET} | Speed: ${CYAN}0.0KiB/s${RESET} | Location: ${MAGENTA}$DISPLAY_LOCATION${RESET}"
+echo -ne "\033[1A"  # Move cursor up 1 line
 
 # Function to update progress bar
 update_progress() {
@@ -393,9 +384,13 @@ update_progress() {
     local total="$3"
     local eta="$4"
     local speed="$5"
-    local item_info="$6"
     
-    percent_int="${percent%.*}"
+    # Clean up values
+    percent=$(echo "$percent" | tr -d '%')
+    percent="${percent:-0}"
+    
+    # Convert to integers
+    percent_int=$(printf "%.0f" "$percent")
     dl_mib=$(( downloaded / 1048576 ))
     tot_mib=$(( total / 1048576 ))
     
@@ -414,24 +409,110 @@ update_progress() {
         printf "Downloading: ${GREEN}%s${RESET} ${BRIGHT_GREEN}100.0%%${RESET} ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
             "$full_bar" "$dl_mib" "$tot_mib"
     else
-        printf "Downloading: ${GREEN}%s${RESET} ${YELLOW}%s${RESET} ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
+        printf "Downloading: ${GREEN}%s${RESET} ${YELLOW}%.1f%%${RESET} ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
             "$full_bar" "$percent" "$dl_mib" "$tot_mib"
     fi
     
+    # Update stats line
     echo -ne "\n${CLEAR_LINE}${GOTO_COL1}"
     printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
         "$eta" "$speed" "$DISPLAY_LOCATION"
     
-    if [ -n "$item_info" ]; then
+    # Show item info for playlists
+    if [[ "$IS_PLAYLIST" == "true" ]] && [ $CURRENT_ITEM -gt 0 ]; then
         echo -ne "\n${CLEAR_LINE}${GOTO_COL1}"
-        printf "Item: ${BRIGHT_CYAN}%s${RESET}" "$item_info"
+        if [ $TOTAL_ITEMS -gt 0 ]; then
+            printf "Item: ${BRIGHT_CYAN}%d of %d${RESET}" "$CURRENT_ITEM" "$TOTAL_ITEMS"
+        else
+            printf "Item: ${BRIGHT_CYAN}%d${RESET}" "$CURRENT_ITEM"
+        fi
         echo -ne "\033[2A"  # Move cursor up 2 lines
     else
         echo -ne "\033[1A"  # Move cursor up 1 line
     fi
 }
 
-if yt-dlp \
+# Function to parse yt-dlp progress
+parse_ytdlp_progress() {
+    local line="$1"
+    
+    # Parse standard yt-dlp progress format
+    if [[ "$line" =~ ([0-9.]+)%[[:space:]]+of[[:space:]]+~?[[:space:]]*([0-9.]+)([KMGT]?)iB.*ETA[[:space:]]+([0-9:]+)[[:space:]]+at[[:space:]]+([0-9.]+)([KMGT]?)iB ]]; then
+        percent="${BASH_REMATCH[1]}"
+        total_size="${BASH_REMATCH[2]}"
+        total_unit="${BASH_REMATCH[3]}"
+        eta="${BASH_REMATCH[4]}"
+        speed="${BASH_REMATCH[5]}"
+        speed_unit="${BASH_REMATCH[6]}"
+        
+        # Convert total to bytes
+        case "$total_unit" in
+            "K") total_bytes=$(echo "$total_size * 1024" | bc -l) ;;
+            "M") total_bytes=$(echo "$total_size * 1048576" | bc -l) ;;
+            "G") total_bytes=$(echo "$total_size * 1073741824" | bc -l) ;;
+            "T") total_bytes=$(echo "$total_size * 1099511627776" | bc -l) ;;
+            *) total_bytes=$(echo "$total_size" | bc -l) ;;
+        esac
+        
+        # Calculate downloaded bytes based on percentage
+        downloaded_bytes=$(echo "$total_bytes * $percent / 100" | bc -l)
+        
+        # Format speed
+        speed_display="${speed}${speed_unit}iB/s"
+        
+        # Update progress
+        update_progress "$percent" "${downloaded_bytes%.*}" "${total_bytes%.*}" "$eta" "$speed_display"
+        return 0
+    fi
+    
+    # Parse download complete
+    if [[ "$line" =~ ([0-9.]+)([KMGT]?)iB.*in[[:space:]]+([0-9:]+) ]]; then
+        size="${BASH_REMATCH[1]}"
+        unit="${BASH_REMATCH[2]}"
+        eta="${BASH_REMATCH[3]}"
+        
+        # Convert to bytes
+        case "$unit" in
+            "K") total_bytes=$(echo "$size * 1024" | bc -l) ;;
+            "M") total_bytes=$(echo "$size * 1048576" | bc -l) ;;
+            "G") total_bytes=$(echo "$size * 1073741824" | bc -l) ;;
+            "T") total_bytes=$(echo "$size * 1099511627776" | bc -l) ;;
+            *) total_bytes=$(echo "$size" | bc -l) ;;
+        esac
+        
+        update_progress "100" "${total_bytes%.*}" "${total_bytes%.*}" "$eta" "Done"
+        return 0
+    fi
+    
+    # Parse playlist item info
+    if [[ "$line" =~ "Downloading item" ]]; then
+        if [[ "$line" =~ ([0-9]+)[[:space:]]+of[[:space:]]+([0-9]+) ]]; then
+            CURRENT_ITEM="${BASH_REMATCH[1]}"
+            TOTAL_ITEMS="${BASH_REMATCH[2]}"
+        fi
+        return 0
+    fi
+    
+    # Return 1 if not a progress line
+    return 1
+}
+
+# Function to handle metadata lines
+print_metadata() {
+    local line="$1"
+    if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]] || \
+       [[ "$line" =~ ^\[download\].*Downloading.*item.*of ]]; then
+        echo -e "${BRIGHT_CYAN}$line${RESET}"
+    elif [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
+        echo -e "${BLUE}$line${RESET}"
+    elif [[ "$line" =~ ^\[ExtractAudio\] ]] || [[ "$line" =~ ^\[Merger\] ]]; then
+        echo -e "${BRIGHT_GREEN}$line${RESET}"
+    fi
+}
+
+# Run yt-dlp and capture output
+{
+yt-dlp \
     $PLAYLIST_FLAG \
     $MP3_FLAGS \
     -f "$FORMAT" \
@@ -445,52 +526,35 @@ if yt-dlp \
     --merge-output-format mp4 \
     --newline \
     --no-warnings \
-    --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
     --output-na-placeholder "-" \
-    "$URL" 2>&1 | while IFS= read -r line; do
-
-    # Parse progress lines
-    if [[ "$line" =~ ^download:([0-9]+)\ ([0-9]+)\ ([0-9]+\.[0-9]+%?)\ ([0-9:-]*)\ (.*)$ ]]; then
-        downloaded="${BASH_REMATCH[1]}"
-        total="${BASH_REMATCH[2]}"
-        percent="${BASH_REMATCH[3]}"
-        eta="${BASH_REMATCH[4]}"
-        speed="${BASH_REMATCH[5]}"
-        
-        item_info=""
-        if [[ "$IS_PLAYLIST" == "true" ]] && [ $CURRENT_ITEM -gt 0 ]; then
-            item_info="Item $CURRENT_ITEM of $TOTAL_ITEMS"
-        fi
-        
-        update_progress "$percent" "$downloaded" "$total" "$eta" "$speed" "$item_info"
+    --progress \
+    "$URL" 2>&1
+} | while IFS= read -r line || [[ -n "$line" ]]; do
+    # First try to parse as progress
+    if parse_ytdlp_progress "$line"; then
         continue
     fi
     
-    # Parse playlist info
-    if [[ "$line" =~ "Downloading.*item.*of.*([0-9]+)" ]]; then
-        TOTAL_ITEMS="${BASH_REMATCH[1]}"
-    fi
-    
-    if [[ "$line" =~ "Downloading item.*([0-9]+).*of" ]]; then
-        CURRENT_ITEM="${BASH_REMATCH[1]}"
-    fi
-    
-    # Print metadata lines
+    # If not progress, print as metadata
     print_metadata "$line"
-    
-done; then
+done
+
+# Check if download was successful
+if [ $? -eq 0 ] || [ $? -eq 130 ]; then  # 130 is SIGINT (Ctrl+C)
     DOWNLOAD_SUCCESS=true
 else
-    EXIT_CODE=$?
-    [[ $EXIT_CODE -ne 0 ]] && echo -e "\n${ORANGE}⚠️  Download exited with code $EXIT_CODE${RESET}"
+    echo -e "\n${ORANGE}⚠️  Download exited with code $?${RESET}"
 fi
 
-# Clean up cursor
-echo -e "${SHOW_CURSOR}${CLEAR_LINE}${GOTO_COL1}\n"
+# Clean up cursor and show final progress
+echo -e "${SHOW_CURSOR}${CLEAR_LINE}${GOTO_COL1}"
+echo -e "${CLEAR_LINE}${GOTO_COL1}Downloading: ${GREEN}████████████████████${RESET} ${BRIGHT_GREEN}100.0%${RESET} ${BRIGHT_BLUE}[Complete]${RESET}"
+echo -e "${CLEAR_LINE}${GOTO_COL1}ETA: ${BRIGHT_GREEN}Done!${RESET} | Speed: ${CYAN}-${RESET} | Location: ${MAGENTA}$DISPLAY_LOCATION${RESET}"
+echo ""
 
 if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-    print_error "❌ DOWNLOAD FAILED"
+    print_error "❌ DOWNLOAD FAILED")
     echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
     echo -e "${CYAN}   💡 TANZANIA FIX:${RESET}"
     echo -e "     1. Disconnect WiFi/Ethernet"
