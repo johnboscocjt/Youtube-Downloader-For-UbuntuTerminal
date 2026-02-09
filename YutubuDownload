@@ -28,12 +28,6 @@ LIME="\033[38;5;46m"
 SKY_BLUE="\033[38;5;39m"
 HOT_PINK="\033[38;5;196m"
 
-# === ARCHIVE HANDLING VARIABLES ===
-SKIP_CURRENT_VIDEO=false
-PROCESS_THIS_VIDEO=false
-EXIT_DOWNLOAD=false
-CURRENT_VIDEO_ID=""
-
 # === HELPER FUNCTION FOR PADDED COLORED OUTPUT ===
 print_padded() {
     local label="$1"
@@ -366,6 +360,7 @@ fi
 
 ARCHIVE_FILE="$HOME/yt-downloads-archive.txt"
 ARCHIVE_FLAG=""
+REMOVE_FROM_ARCHIVE=""
 
 if [[ "$IS_PLAYLIST" == "true" ]]; then
     ARCHIVE_FLAG="--download-archive $ARCHIVE_FILE"
@@ -402,6 +397,7 @@ else
                 echo -e "${LIME}✅ DELETED $VIDEO_ID from archive. Proceeding with fresh download...${RESET}"
                 echo ""
                 ARCHIVE_FLAG=""
+                REMOVE_FROM_ARCHIVE="$VIDEO_ID"
             else
                 echo -e "${LIME}✅ SKIPPED download per your choice.${RESET}"
                 echo -e "${CYAN}   To force download next time, use:${RESET}"
@@ -455,14 +451,17 @@ echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)
 
 # === SMOOTH ARCHIVE HANDLING FOR ALL DOWNLOAD TYPES ===
 DOWNLOAD_SUCCESS=false
+ANY_VIDEO_DOWNLOADED=false
+VIDEO_SKIPPED=false
+EXIT_DOWNLOAD=false
+RE_DOWNLOAD_VIDEO=""
 
-for ATTEMPT in 1 2 3; do
-    # Reset skip flag for each attempt
-    SKIP_CURRENT_VIDEO=false
-    PROCESS_THIS_VIDEO=false
-    EXIT_DOWNLOAD=false
+# Function to run yt-dlp with proper archive handling
+run_ytdlp() {
+    local archive_flag="$1"
+    local url="$2"
     
-    if yt-dlp \
+    yt-dlp \
         $PLAYLIST_FLAG \
         $MP3_FLAGS \
         -f "$FORMAT" \
@@ -474,208 +473,263 @@ for ATTEMPT in 1 2 3; do
         --continue \
         --no-overwrites \
         --merge-output-format mp4 \
-        $ARCHIVE_FLAG \
+        $archive_flag \
         --newline \
         --no-warnings \
         --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
         --output-na-placeholder "-" \
-        "$URL" 2>&1 | while IFS= read -r line; do
+        "$url"
+}
+
+# Function to handle archive decisions
+handle_archive_decision() {
+    local video_id="$1"
+    local is_playlist="$2"
+    
+    echo ""
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    echo -e "${ORANGE}⚠️  VIDEO ALREADY IN ARCHIVE DETECTED  ⚠️${RESET}"
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    echo ""
+    echo -e "   ${CYAN}Video ID:${RESET} $video_id"
+    echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
+    echo ""
+    
+    if [[ "$is_playlist" == "true" ]]; then
+        echo -e "   ${CYAN}Options for PLAYLIST:${RESET}"
+        echo -e "     ${BRIGHT_GREEN}s${RESET} = SKIP this video (continue with playlist)"
+        echo -e "     ${BRIGHT_BLUE}r${RESET} = RE-DOWNLOAD (remove from archive)"
+        echo -e "     ${BRIGHT_RED}x${RESET} = EXIT (stop entire download)"
+        echo -n -e "   ${BRIGHT_CYAN}Your choice (s/r/x) [default=s]: ${RESET}"
+        read -r CHOICE </dev/tty
+        CHOICE=$(echo "${CHOICE:-s}" | tr '[:upper:]' '[:lower:]')
+        echo ""
         
-        # Handle "already recorded in archive" messages - EXTRACT VIDEO ID
-        if [[ "$line" =~ "has already been recorded in the archive" ]]; then
-            if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
-                CURRENT_VIDEO_ID="${BASH_REMATCH[1]}"
+        case "$CHOICE" in
+            r)
+                grep -vxF "$video_id" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+                echo -e "${LIME}✅ REMOVED $video_id from archive${RESET}"
+                echo -e "${SKY_BLUE}🔄 This video will be downloaded NOW${RESET}"
                 echo ""
-                echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-                echo -e "${ORANGE}⚠️  VIDEO ALREADY IN ARCHIVE DETECTED  ⚠️${RESET}"
-                echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                RE_DOWNLOAD_VIDEO="$video_id"
+                return 2  # Re-download
+                ;;
+            x)
+                echo -e "${LIME}✅ Stopping playlist download per your choice${RESET}"
+                return 3  # Exit
+                ;;
+            *)
+                echo -e "${LIME}✅ SKIPPING $video_id (continuing with playlist)${RESET}"
+                VIDEO_SKIPPED=true
                 echo ""
-                echo -e "   ${CYAN}Video ID:${RESET} $CURRENT_VIDEO_ID"
-                echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
-                echo ""
+                return 1  # Skip
+                ;;
+        esac
+    else
+        # SINGLE VIDEO MODE
+        echo -e "   ${CYAN}Options for SINGLE VIDEO:${RESET}"
+        echo -e "     ${BRIGHT_GREEN}r${RESET} = RE-DOWNLOAD (remove from archive)"
+        echo -e "     ${BRIGHT_RED}s${RESET} = SKIP (exit without downloading)"
+        echo -n -e "   ${BRIGHT_CYAN}Your choice (r/s) [default=r]: ${RESET}"
+        read -r CHOICE </dev/tty
+        CHOICE=$(echo "${CHOICE:-r}" | tr '[:upper:]' '[:lower:]')
+        echo ""
+        
+        if [[ "$CHOICE" == "r" ]]; then
+            grep -vxF "$video_id" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+            mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+            echo -e "${LIME}✅ REMOVED $video_id from archive${RESET}"
+            echo -e "${SKY_BLUE}🔄 Continuing with download...${RESET}"
+            echo ""
+            RE_DOWNLOAD_VIDEO="$video_id"
+            return 2  # Re-download
+        else
+            echo -e "${LIME}✅ SKIPPED download per your choice${RESET}"
+            return 3  # Exit
+        fi
+    fi
+}
+
+# Process download
+for ATTEMPT in 1 2 3; do
+    # If we need to re-download a specific video, do it without archive flag
+    if [[ -n "$RE_DOWNLOAD_VIDEO" ]]; then
+        echo -e "${SKY_BLUE}🔄 Re-downloading video $RE_DOWNLOAD_VIDEO...${RESET}"
+        echo ""
+        
+        if run_ytdlp "" "$URL" 2>&1 | while IFS= read -r line; do
+            # Parse progress line
+            if [[ "$line" =~ ^download: ]]; then
+                read -r downloaded total percent eta speed <<< "$line"
                 
-                if [[ "$IS_PLAYLIST" == "true" ]]; then
-                    echo -e "   ${CYAN}Options for PLAYLIST:${RESET}"
-                    echo -e "     ${BRIGHT_GREEN}s${RESET} = SKIP this video (continue with playlist)"
-                    echo -e "     ${BRIGHT_BLUE}r${RESET} = RE-DOWNLOAD (remove from archive)"
-                    echo -e "     ${BRIGHT_RED}x${RESET} = EXIT (stop entire download)"
-                    echo -n -e "   ${BRIGHT_CYAN}Your choice (s/r/x) [default=s]: ${RESET}"
-                    read -r CHOICE </dev/tty
-                    CHOICE=$(echo "${CHOICE:-s}" | tr '[:upper:]' '[:lower:]')
-                    echo ""
+                if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
+                    percent_int="${BASH_REMATCH[1]}"
                     
-                    case "$CHOICE" in
-                        r)
-                            grep -vxF "$CURRENT_VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
-                            mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-                            echo -e "${LIME}✅ REMOVED $CURRENT_VIDEO_ID from archive${RESET}"
-                            echo -e "${SKY_BLUE}🔄 This video will be downloaded NOW${RESET}"
-                            echo ""
-                            # Set a flag to continue processing this video
-                            PROCESS_THIS_VIDEO=true
-                            # Don't set SKIP_CURRENT_VIDEO=true - let yt-dlp continue
+                    # Calculate downloaded MiB correctly
+                    if [[ "$downloaded" =~ ^[0-9]+$ ]] && [ "$downloaded" -gt 0 ]; then
+                        dl_mib=$(( downloaded / 1048576 ))
+                    else
+                        dl_mib=0
+                    fi
+                    
+                    # Calculate total MiB correctly  
+                    if [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
+                        tot_mib=$(( total / 1048576 ))
+                    else
+                        tot_mib=0
+                    fi
+                    
+                    # Create progress bar
+                    filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+                    bar=$(printf '█%.0s' $(seq 1 "$filled"))
+                    empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+                    full_bar="$bar$empty"
+                    
+                    if [ "$percent_int" -ge 99 ]; then
+                        percent_display="100.0%"
+                        printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                        printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
+                            "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+                    else
+                        printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                        printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
+                            "$full_bar" "$percent" "$dl_mib" "$tot_mib"
+                    fi
+                    
+                    # Second line with ETA, Speed, and Location
+                    printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
+                        "$eta" "$speed" "$DISPLAY_LOCATION"
+                    
+                    sleep 0.1
+                fi
+            elif [[ "$line" =~ ^\[ ]]; then
+                echo -e "${CYAN}$line${RESET}"
+            fi
+        done; then
+            DOWNLOAD_SUCCESS=true
+            ANY_VIDEO_DOWNLOADED=true
+            break
+        fi
+    else
+        # Normal download with archive
+        if run_ytdlp "$ARCHIVE_FLAG" "$URL" 2>&1 | while IFS= read -r line; do
+            # Check for archive messages
+            if [[ "$line" =~ "has already been recorded in the archive" ]]; then
+                if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
+                    local video_id="${BASH_REMATCH[1]}"
+                    handle_archive_decision "$video_id" "$IS_PLAYLIST"
+                    local decision=$?
+                    
+                    case $decision in
+                        1)  # Skip
+                            VIDEO_SKIPPED=true
+                            continue
                             ;;
-                        x)
-                            echo -e "${LIME}✅ Stopping playlist download per your choice${RESET}"
-                            # Use a flag to exit the entire download
+                        2)  # Re-download
+                            RE_DOWNLOAD_VIDEO="$video_id"
+                            break 2  # Break out of while loop to restart download
+                            ;;
+                        3)  # Exit
                             EXIT_DOWNLOAD=true
-                            break 2  # Break out of both the while loop and the attempt loop
-                            ;;
-                        *)
-                            echo -e "${LIME}✅ SKIPPING $CURRENT_VIDEO_ID (continuing with playlist)${RESET}"
-                            SKIP_CURRENT_VIDEO=true
-                            echo ""
-                            continue  # Continue to next line in the while loop
+                            break 2  # Break out of while loop
                             ;;
                     esac
-                else
-                    # SINGLE VIDEO MODE
-                    echo -e "   ${CYAN}Options for SINGLE VIDEO:${RESET}"
-                    echo -e "     ${BRIGHT_GREEN}r${RESET} = RE-DOWNLOAD (remove from archive)"
-                    echo -e "     ${BRIGHT_RED}s${RESET} = SKIP (exit without downloading)"
-                    echo -n -e "   ${BRIGHT_CYAN}Your choice (r/s) [default=r]: ${RESET}"
-                    read -r CHOICE </dev/tty
-                    CHOICE=$(echo "${CHOICE:-r}" | tr '[:upper:]' '[:lower:]')
-                    echo ""
-                    
-                    if [[ "$CHOICE" == "r" ]]; then
-                        grep -vxF "$CURRENT_VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
-                        mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-                        echo -e "${LIME}✅ REMOVED $CURRENT_VIDEO_ID from archive${RESET}"
-                        echo -e "${SKY_BLUE}🔄 Continuing with download...${RESET}"
-                        echo ""
-                        # Continue normally - let yt-dlp download this video
-                        PROCESS_THIS_VIDEO=true
-                    else
-                        echo -e "${LIME}✅ SKIPPED download per your choice${RESET}"
-                        EXIT_DOWNLOAD=true
-                        break 2  # Break out of both the while loop and the attempt loop
-                    fi
                 fi
             fi
-        fi
-        
-        # If we're skipping this video in playlist, skip all lines for it
-        if [[ "$SKIP_CURRENT_VIDEO" == "true" ]] && [[ "$line" =~ \[download\].*$CURRENT_VIDEO_ID ]]; then
-            continue
-        fi
-        
-        # Handle metadata lines - Color them!
-        if [[ "$line" =~ ^\[ ]]; then
-            # Color different types of metadata lines
-            if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]]; then
-                # Playlist download start
-                echo -e "${BRIGHT_MAGENTA}$line${RESET}"
-            elif [[ "$line" =~ ^\[download\].*Downloading.*item.*of ]]; then
-                # Individual video download start
-                echo -e "${BRIGHT_CYAN}$line${RESET}"
-            elif [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
-                # URL extraction
-                echo -e "${SKY_BLUE}$line${RESET}"
-            elif [[ "$line" =~ ^\[youtube\].*Downloading.*webpage ]]; then
-                # Webpage download
-                echo -e "${CYAN}$line${RESET}"
-            elif [[ "$line" =~ ^\[youtube\].*\[jsc: ]]; then
-                # JS challenge solving
-                echo -e "${BRIGHT_GREEN}$line${RESET}"
-            elif [[ "$line" =~ ^\[info\].*Downloading.*format ]]; then
-                # Format info
-                echo -e "${LIME}$line${RESET}"
-            elif [[ "$line" =~ ^\[download\] ]]; then
-                # Generic download messages
-                echo -e "${BRIGHT_BLUE}$line${RESET}"
-            elif [[ "$line" =~ ^\[youtube\] ]]; then
-                # Generic youtube messages
-                echo -e "${BLUE}$line${RESET}"
-            elif [[ "$line" =~ ^\[ExtractAudio\] ]]; then
-                # MP3 conversion
-                echo -e "${BRIGHT_GREEN}$line${RESET}"
-            elif [[ "$line" =~ ^\[Merger\] ]]; then
-                # Audio/video merging
-                echo -e "${BRIGHT_GREEN}$line${RESET}"
-            else
-                # Other metadata
-                echo -e "${CYAN}$line${RESET}"
-            fi
-            continue
-        fi
-        
-        # Parse progress line
-        if [[ "$line" =~ ^download: ]]; then
-            read -r downloaded total percent eta speed <<< "$line"
             
-            if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
-                percent_int="${BASH_REMATCH[1]}"
+            # Check if this is a download progress line
+            if [[ "$line" =~ ^download: ]] || [[ "$line" =~ \[download\]\ Downloading ]]; then
+                ANY_VIDEO_DOWNLOADED=true
+            fi
+            
+            # Handle metadata lines
+            if [[ "$line" =~ ^\[ ]]; then
+                echo -e "${CYAN}$line${RESET}"
+                continue
+            fi
+            
+            # Parse progress line
+            if [[ "$line" =~ ^download: ]]; then
+                read -r downloaded total percent eta speed <<< "$line"
                 
-                # Calculate downloaded MiB correctly
-                if [[ "$downloaded" =~ ^[0-9]+$ ]] && [ "$downloaded" -gt 0 ]; then
-                    dl_mib=$(( downloaded / 1048576 ))
-                else
-                    dl_mib=0
+                if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
+                    percent_int="${BASH_REMATCH[1]}"
+                    
+                    # Calculate downloaded MiB correctly
+                    if [[ "$downloaded" =~ ^[0-9]+$ ]] && [ "$downloaded" -gt 0 ]; then
+                        dl_mib=$(( downloaded / 1048576 ))
+                    else
+                        dl_mib=0
+                    fi
+                    
+                    # Calculate total MiB correctly  
+                    if [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
+                        tot_mib=$(( total / 1048576 ))
+                    else
+                        tot_mib=0
+                    fi
+                    
+                    # Create progress bar
+                    filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+                    bar=$(printf '█%.0s' $(seq 1 "$filled"))
+                    empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+                    full_bar="$bar$empty"
+                    
+                    if [ "$percent_int" -ge 99 ]; then
+                        percent_display="100.0%"
+                        printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                        printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
+                            "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+                    else
+                        printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                        printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
+                            "$full_bar" "$percent" "$dl_mib" "$tot_mib"
+                    fi
+                    
+                    # Second line with ETA, Speed, and Location
+                    printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
+                        "$eta" "$speed" "$DISPLAY_LOCATION"
+                    
+                    sleep 0.1
                 fi
-                
-                # Calculate total MiB correctly  
-                if [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
-                    tot_mib=$(( total / 1048576 ))
+            fi
+            
+            # Post-processing detection
+            if [[ "$line" =~ \[ExtractAudio\] || "$line" =~ Destination:.*\.mp3 ]] || [[ "$line" =~ \[Merger\] ]]; then
+                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                if [[ "$IS_MP3" == "true" ]]; then
+                    printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - converting to MP3..."
                 else
-                    tot_mib=0
+                    printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - merging audio/video..."
                 fi
-                
-                # Create progress bar
-                filled=$(( (percent_int * BAR_WIDTH) / 100 ))
-                bar=$(printf '█%.0s' $(seq 1 "$filled"))
-                empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
-                full_bar="$bar$empty"
-                
-                if [ "$percent_int" -ge 99 ]; then
-                    percent_display="100.0%"
-                    # Use green status directly in printf
-                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
-                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
-                else
-                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
-                        "$full_bar" "$percent" "$dl_mib" "$tot_mib"
-                fi
-                
-                # Second line with ETA, Speed, and Location
                 printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
-                printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
-                    "$eta" "$speed" "$DISPLAY_LOCATION"
-                
-                sleep 0.1
+                printf "Post-processing in progress... please wait"
             fi
-        fi
-        
-        # Post-processing detection
-        if [[ "$line" =~ \[ExtractAudio\] || "$line" =~ Destination:.*\.mp3 ]] || [[ "$line" =~ \[Merger\] ]]; then
-            printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-            if [[ "$IS_MP3" == "true" ]]; then
-                printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - converting to MP3..."
+            
+        done; then
+            if [[ -z "$RE_DOWNLOAD_VIDEO" ]]; then  # Only set success if we didn't need to re-download
+                DOWNLOAD_SUCCESS=true
+            fi
+            break
+        else
+            echo ""
+            if [[ $ATTEMPT -lt 3 ]] && [[ -z "$RE_DOWNLOAD_VIDEO" ]]; then
+                print_error "⚠️  Attempt $ATTEMPT failed. Refreshing cookies..."
+                pkill -f "chrome" 2>/dev/null || true
+                sleep 3
+                google-chrome-stable --no-startup-window 2>/dev/null &
+                CHROME_PID=$!
+                sleep 3
+                kill $CHROME_PID 2>/dev/null || true
+                wait $CHROME_PID 2>/dev/null || true
+                echo -e "${SKY_BLUE}🔄 Retrying (attempt $((ATTEMPT + 1))...${RESET}"
+                sleep 2
             else
-                printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET} - merging audio/video..."
+                break
             fi
-            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
-            printf "Post-processing in progress... please wait"
-        fi
-        
-    done; then
-        DOWNLOAD_SUCCESS=true
-        break
-    else
-        echo ""
-        if [[ $ATTEMPT -lt 3 ]]; then
-            print_error "⚠️  Attempt $ATTEMPT failed. Refreshing cookies..."
-            pkill -f "chrome" 2>/dev/null || true
-            sleep 3
-            google-chrome-stable --no-startup-window 2>/dev/null &
-            CHROME_PID=$!
-            sleep 3
-            kill $CHROME_PID 2>/dev/null || true
-            wait $CHROME_PID 2>/dev/null || true
-            echo -e "${SKY_BLUE}🔄 Retrying (attempt $((ATTEMPT + 1))...${RESET}"
-            sleep 2
         fi
     fi
 done
@@ -683,8 +737,13 @@ done
 # Show cursor again
 echo -e "${SHOW_CURSOR}"
 
-# Check if user chose to exit (x option) - don't show failure message
-if [[ "$DOWNLOAD_SUCCESS" == false ]] && [[ "$EXIT_DOWNLOAD" != "true" ]]; then
+# Check results and show appropriate message
+if [[ "$EXIT_DOWNLOAD" == "true" ]]; then
+    echo ""
+    echo -e "${LIME}✅ Download session stopped per your choice.${RESET}"
+    echo ""
+    exit 0
+elif [[ "$DOWNLOAD_SUCCESS" == false ]] && [[ -z "$RE_DOWNLOAD_VIDEO" ]]; then
     echo ""
     echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
     print_error "❌ DOWNLOAD FAILED AFTER 3 ATTEMPTS"
@@ -694,41 +753,41 @@ if [[ "$DOWNLOAD_SUCCESS" == false ]] && [[ "$EXIT_DOWNLOAD" != "true" ]]; then
     echo -e "     2. Wait 10 seconds"
     echo -e "     3. Reconnect and retry"
     exit 1
-fi
-
-# Only show completion box if download was successful OR if we exited by choice
-if [[ "$DOWNLOAD_SUCCESS" == true ]] || [[ "$EXIT_DOWNLOAD" == true ]] || [[ "$SKIP_CURRENT_VIDEO" == true ]]; then
-    # Show completion box only if we actually downloaded something
-    if [[ "$DOWNLOAD_SUCCESS" == true ]] || [[ "$PROCESS_THIS_VIDEO" == true ]]; then
-        # === PERFECTLY ALIGNED COMPLETION BOX ===
-        echo ""
-        echo -e "${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${RESET}"
-        echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-        printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at %-52s ${BRIGHT_GREEN}║${RESET}\n" "$(date '+%I:%M:%S %p')"
-        echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-        printf "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} %-63s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$USE_FOLDER" == "true" ]] && echo "${FOLDER_NAME//\\033\[[0-9;]*m/}" || echo "Current directory" )"
-        printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} %-68s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}FULL PLAYLIST${RESET}" || echo "SINGLE VIDEO ONLY" )"
-        printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
-        printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
-        echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-        echo -e "${BRIGHT_GREEN}║${RESET}    ${BRIGHT_CYAN}💡 TANZANIA TIPS:${RESET}                                                         ${BRIGHT_GREEN}║${RESET}"
-        printf "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Single video? Script ${BRIGHT_GREEN}IGNORES ?list= params${RESET}                                 ${BRIGHT_GREEN}║${RESET}"
-        printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Audio missing? ${BRIGHT_YELLOW}Re-download at 720p${RESET} (most reliable streams)                 ${BRIGHT_GREEN}║${RESET}"
-        printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Bot errors? Script ${BRIGHT_GREEN}auto-refreshes cookies${RESET}                                  ${BRIGHT_GREEN}║${RESET}"
-        printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Slow network? ${BRIGHT_YELLOW}720p works 95% of time on Vodacom/Airtel${RESET}                       ${BRIGHT_GREEN}║${RESET}"
-        echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-        # Hand-padded for 2-character wide emojis
-        printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_MAGENTA}Enjoy your downloads! 🌍✨${RESET}                                                   ${BRIGHT_GREEN}║${RESET}"
-        printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)${RESET}                       ${BRIGHT_GREEN}║${RESET}"
-        echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-        echo -e "${BRIGHT_GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${RESET}"
-        echo ""
-    else
-        # If we just skipped without downloading anything
-        echo ""
-        echo -e "${LIME}✅ Download session completed. No new videos were downloaded.${RESET}"
-        echo ""
-    fi
+elif [[ "$VIDEO_SKIPPED" == "true" && "$ANY_VIDEO_DOWNLOADED" == "false" && -z "$RE_DOWNLOAD_VIDEO" ]]; then
+    # All videos were skipped, none downloaded
+    echo ""
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    echo -e "${CYAN}📊 DOWNLOAD SUMMARY${RESET}"
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    echo -e "${CYAN}Status:${RESET} ${LIME}All videos already in archive${RESET}"
+    echo -e "${CYAN}Action:${RESET} No new downloads needed"
+    echo -e "${CYAN}Tip:${RESET} Use --force-download flag to re-download archived videos"
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    echo ""
+elif [[ "$ANY_VIDEO_DOWNLOADED" == "true" ]] || [[ -n "$RE_DOWNLOAD_VIDEO" ]]; then
+    # Show full completion box if anything was downloaded
+    echo ""
+    echo -e "${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+    printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at %-52s ${BRIGHT_GREEN}║${RESET}\n" "$(date '+%I:%M:%S %p')"
+    echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+    printf "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} %-63s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$USE_FOLDER" == "true" ]] && echo "${FOLDER_NAME//\\033\[[0-9;]*m/}" || echo "Current directory" )"
+    printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} %-68s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}FULL PLAYLIST${RESET}" || echo "SINGLE VIDEO ONLY" )"
+    printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
+    printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
+    echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+    echo -e "${BRIGHT_GREEN}║${RESET}    ${BRIGHT_CYAN}💡 TANZANIA TIPS:${RESET}                                                         ${BRIGHT_GREEN}║${RESET}"
+    printf "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Single video? Script ${BRIGHT_GREEN}IGNORES ?list= params${RESET}                                 ${BRIGHT_GREEN}║${RESET}"
+    printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Audio missing? ${BRIGHT_YELLOW}Re-download at 720p${RESET} (most reliable streams)                 ${BRIGHT_GREEN}║${RESET}"
+    printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Bot errors? Script ${BRIGHT_GREEN}auto-refreshes cookies${RESET}                                  ${BRIGHT_GREEN}║${RESET}"
+    printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Slow network? ${BRIGHT_YELLOW}720p works 95% of time on Vodacom/Airtel${RESET}                       ${BRIGHT_GREEN}║${RESET}"
+    echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+    # Hand-padded for 2-character wide emojis
+    printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_MAGENTA}Enjoy your downloads! 🌍✨${RESET}                                                   ${BRIGHT_GREEN}║${RESET}"
+    printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)${RESET}                       ${BRIGHT_GREEN}║${RESET}"
+    echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
+    echo -e "${BRIGHT_GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
 fi
 
 # === SIGNATURE: QUOTE FROM JOHN BOSCO + ALIEN ART (GREEN) ===
