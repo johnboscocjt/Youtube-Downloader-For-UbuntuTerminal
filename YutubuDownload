@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.0.4 — NO ARCHIVE • SINGLE PROGRESS BAR • WORKING
+# Version: 1.0.5 — NO ARCHIVE • SINGLE PROGRESS BAR • NO ERRORS
 
 set -euo pipefail
 
@@ -79,7 +79,7 @@ extract_video_id() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.0.4 (2026-02-10) • Tanzania-Optimized • NO ARCHIVE"
+    echo "YutubuDownload v1.0.5 (2026-02-10) • Tanzania-Optimized • NO ARCHIVE"
     exit 0
 fi
 
@@ -100,7 +100,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.4${RESET}"
+echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.5${RESET}"
 
 # === SMART COOKIE REFRESH (Tanzania-optimized) ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
@@ -180,17 +180,27 @@ else
 fi
 echo ""
 
-# === USER INPUTS ===
-
-# URL
+# === URL INPUT — SAFE TRIMMING ===
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${BRIGHT_CYAN}📥 URL INPUT${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${CYAN}Enter YouTube URL (video or playlist):${RESET}"
 echo -n -e "${BRIGHT_CYAN}> ${RESET}"
-read -r URL || { echo ""; exit 1; }
-URL=$(echo "$URL" | xargs)
-[[ -z "$URL" ]] && { print_error "❌ No URL provided. Exiting."; exit 1; }
+
+read -r URL_RAW || { echo ""; exit 1; }
+
+# Trim whitespace safely
+URL=$(printf '%s' "$URL_RAW" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+if [[ -z "$URL" ]]; then
+    print_error "❌ No URL provided. Exiting."
+    exit 1
+fi
+
+if ! [[ "$URL" =~ ^https?:// ]]; then
+    print_error "❌ Invalid URL. Must start with https://"
+    exit 1
+fi
 echo ""
 
 # Download type
@@ -368,10 +378,11 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download...${RESET}"
 
-# === CORE yt-dlp COMMAND — NO ARCHIVE + WORKING PROGRESS ===
+# === CORE yt-dlp COMMAND — WORKING PROGRESS ===
 DOWNLOAD_SUCCESS=false
 
 if yt-dlp \
+    --console-title \
     $PLAYLIST_FLAG \
     $MP3_FLAGS \
     -f "$FORMAT" \
@@ -383,7 +394,6 @@ if yt-dlp \
     --continue \
     --no-overwrites \
     --merge-output-format mp4 \
-    --console-title \                          # ←← THIS ENABLES PROGRESS
     --newline \
     --no-warnings \
     --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
@@ -410,7 +420,7 @@ if yt-dlp \
         continue
     fi
 
-    # ✅ ONLY process real progress lines
+    # Process real progress lines
     if [[ "$line" == download:* ]]; then
         read -r _ downloaded total percent eta speed <<< "$line"
         if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
