@@ -88,7 +88,7 @@ get_video_title() {
     
     if [[ -n "$video_id" ]]; then
         # Use cookies for better success rate
-        title=$(timeout 15 yt-dlp --cookies-from-browser chrome --get-title "https://youtu.be/$video_id" 2>/dev/null | head -n1 || echo "Unknown Title")
+        title=$(timeout 10 yt-dlp --cookies-from-browser chrome --get-title "https://youtu.be/$video_id" 2>/dev/null | head -n1 || echo "Unknown Title")
         title=$(echo "$title" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 80)
         [[ -z "$title" || "$title" == "Unknown Title" ]] && title="[Title Unavailable - Requires Login]"
     fi
@@ -104,26 +104,61 @@ process_playlist_archive() {
     echo -e "${SKY_BLUE}🔄 Analyzing playlist for archived videos...${RESET}"
     echo -e "${CYAN}This may take a moment depending on playlist size...${RESET}"
     
-    # Get all video IDs in the playlist WITH COOKIES
-    echo -e "${SKY_BLUE}Fetching playlist data (with authentication)...${RESET}"
+    # Create a temporary file to store video IDs
+    local temp_ids_file=$(mktemp)
     
-    local all_video_ids
-    all_video_ids=$(timeout 45 yt-dlp \
+    # Get all video IDs in the playlist - USE SIMPLE APPROACH
+    echo -e "${SKY_BLUE}Fetching playlist data...${RESET}"
+    
+    # Try different methods to get playlist IDs
+    local all_video_ids=""
+    
+    # Method 1: Try with cookies first (timeout 30 seconds)
+    timeout 30 yt-dlp \
         --cookies-from-browser chrome \
         --yes-playlist \
         --get-id \
         --quiet \
-        "$url" 2>/dev/null | head -n 100)
+        --no-warnings \
+        "$url" > "$temp_ids_file" 2>/dev/null
     
-    if [[ -z "$all_video_ids" ]]; then
-        echo -e "${ORANGE}⚠️  Could not fetch playlist info. Trying without authentication...${RESET}"
-        # Try without cookies as fallback
-        all_video_ids=$(timeout 30 yt-dlp \
+    # Check if we got any IDs
+    if [[ -s "$temp_ids_file" ]]; then
+        all_video_ids=$(cat "$temp_ids_file" | head -n 100)
+        echo -e "${LIME}✅ Fetched playlist with authentication${RESET}"
+    else
+        # Method 2: Try without cookies
+        echo -e "${ORANGE}⚠️  Trying without authentication...${RESET}"
+        timeout 20 yt-dlp \
             --yes-playlist \
             --get-id \
             --quiet \
-            "$url" 2>/dev/null | head -n 50)
+            --no-warnings \
+            "$url" > "$temp_ids_file" 2>/dev/null
+        
+        if [[ -s "$temp_ids_file" ]]; then
+            all_video_ids=$(cat "$temp_ids_file" | head -n 50)
+            echo -e "${LIME}✅ Fetched playlist without authentication${RESET}"
+        else
+            # Method 3: Last resort - use yt-dlp with --flat-playlist
+            echo -e "${ORANGE}⚠️  Trying flat playlist method...${RESET}"
+            timeout 15 yt-dlp \
+                --yes-playlist \
+                --flat-playlist \
+                --print "%(id)s" \
+                --quiet \
+                --no-warnings \
+                "$url" > "$temp_ids_file" 2>/dev/null
+            
+            if [[ -s "$temp_ids_file" ]]; then
+                all_video_ids=$(cat "$temp_ids_file" | head -n 30)
+                echo -e "${LIME}✅ Fetched playlist with flat method${RESET}"
+            fi
+        fi
     fi
+    
+    # Clean up temp file
+    rm -f "$temp_ids_file" 2>/dev/null || true
     
     if [[ -z "$all_video_ids" ]]; then
         echo -e "${ORANGE}⚠️  Could not fetch playlist info. Will proceed with normal download.${RESET}"
@@ -137,18 +172,19 @@ process_playlist_archive() {
     
     # Check archive for each video
     local archived_videos=()
-    local index=1
+    local total_checked=0
     
     echo -e "${SKY_BLUE}Checking archive...${RESET}"
     
     while IFS= read -r video_id; do
         [[ -z "$video_id" ]] && continue
+        ((total_checked++))
+        
+        echo -ne "${CYAN}Checking video $total_checked/$video_count...${RESET}\r"
         
         if grep -qxF "$video_id" "$archive_file" 2>/dev/null; then
             archived_videos+=("$video_id")
-            echo -ne "${CYAN}Found archived video $index...${RESET}\r"
         fi
-        ((index++))
     done <<< "$all_video_ids"
     
     echo -e "${CLEAR_LINE}${GOTO_COL1}${LIME}✅ Archive check complete${RESET}"
@@ -169,9 +205,6 @@ process_playlist_archive() {
     local videos_to_remove=()
     local videos_to_keep=()
     local index=1
-    
-    echo -e "${CYAN}Processing archived videos...${RESET}"
-    echo ""
     
     for video_id in "${archived_videos[@]}"; do
         local video_title
@@ -595,8 +628,8 @@ fi
 
 # For playlists: Two-pass approach
 if [[ "$IS_PLAYLIST" == "true" ]]; then
+    echo -e "${SKY_BLUE}🔄 Checking playlist archive...${RESET}"
     process_playlist_archive "$URL" "$ARCHIVE_FILE"
-    echo ""
     echo -e "${SKY_BLUE}🔄 Starting actual download now...${RESET}"
     echo ""
 fi
