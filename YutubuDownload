@@ -110,10 +110,12 @@ show_progress_bar() {
         echo -ne "Item ${current}/${total}: ${BRIGHT_CYAN}${title}${RESET}"
         echo -ne "\n${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
         echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
+        echo -ne "\033[1A"  # Move cursor up 1 line
     else
         echo -ne "${BRIGHT_CYAN}${title}${RESET}"
         echo -ne "\n${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
         echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
+        echo -ne "\033[1A"  # Move cursor up 1 line
     fi
 }
 
