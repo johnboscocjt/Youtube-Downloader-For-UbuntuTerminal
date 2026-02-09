@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.0.5 — Clean progress bar without output corruption
+# Version: 1.0.6 — Individual video progress bars
 
 set -euo pipefail
 
@@ -79,7 +79,7 @@ extract_video_id() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.0.5 (2026-02-10) • Tanzania-Optimized • CLEAN PROGRESS BAR"
+    echo "YutubuDownload v1.0.6 (2026-02-10) • Tanzania-Optimized • INDIVIDUAL PROGRESS BARS"
     exit 0
 fi
 
@@ -100,7 +100,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.5${RESET}"
+echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.6${RESET}"
 
 # === SMART COOKIE REFRESH (Tanzania-optimized) ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
@@ -348,107 +348,49 @@ echo -e "${CYAN}Resume/Skip:${RESET}   ${BRIGHT_GREEN}File-based (auto-resume & 
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
 
-# === PROGRESS BAR SETUP ===
-BAR_WIDTH=20
-CSI="\033["
-HIDE_CURSOR="${CSI}?25l"
-SHOW_CURSOR="${CSI}?25h"
-CLEAR_LINE="${CSI}2K"
-GOTO_COL1="${CSI}0G"
-UP_1="${CSI}1A"
-
-echo -e "$HIDE_CURSOR"
-trap 'echo -e "${SHOW_CURSOR}\n"; exit' INT TERM EXIT
-
-DISPLAY_LOCATION="${FOLDER_NAME:-Current directory}"
+# Function to display individual progress bar
+show_progress_bar() {
+    local percent="$1"
+    local current="$2"
+    local total="$3"
+    local eta="$4"
+    local speed="$5"
+    
+    local BAR_WIDTH=20
+    local percent_int=$(printf "%.0f" "$percent")
+    [ $percent_int -gt 100 ] && percent_int=100
+    [ $percent_int -lt 0 ] && percent_int=0
+    
+    local filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+    [ $filled -gt $BAR_WIDTH ] && filled=$BAR_WIDTH
+    local bar=$(printf '█%.0s' $(seq 1 "$filled"))
+    local empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+    
+    # Clear line and show progress
+    echo -ne "\r\033[K"
+    
+    if [[ "$IS_PLAYLIST" == "true" ]] && [ "$total" != "1" ]; then
+        echo -ne "Item ${current}/${total}: ${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
+        echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
+    else
+        echo -ne "Downloading: ${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
+        echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
+    fi
+}
 
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-echo -e "${SKY_BLUE}Starting download...${RESET}"
 echo ""
 
-# Reserve 3 lines for progress display
-echo -e "${CLEAR_LINE}${GOTO_COL1}"  # Line 1: Progress bar
-echo -e "${CLEAR_LINE}${GOTO_COL1}"  # Line 2: Stats
-echo -e "${CLEAR_LINE}${GOTO_COL1}"  # Line 3: Item info
-echo -ne "\033[3A"  # Move cursor up 3 lines
-
-# Initialize progress bar
-LAST_PROGRESS_LINE=""
-LAST_STATS_LINE=""
-LAST_ITEM_LINE=""
-
-# Function to update progress display
-update_progress_display() {
-    local percent="$1"
-    local downloaded_mib="$2"
-    local total_mib="$3"
-    local eta="$4"
-    local speed="$5"
-    local item_info="$6"
-    
-    # Build progress bar
-    percent_int=$(printf "%.0f" "$percent")
-    [ $percent_int -gt 100 ] && percent_int=100
-    [ $percent_int -lt 0 ] && percent_int=0
-    
-    filled=$(( (percent_int * BAR_WIDTH) / 100 ))
-    [ $filled -gt $BAR_WIDTH ] && filled=$BAR_WIDTH
-    bar=$(printf '█%.0s' $(seq 1 "$filled"))
-    empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
-    full_bar="$bar$empty"
-    
-    # Progress line
-    if [ $percent_int -ge 99 ]; then
-        progress_line="Downloading: ${GREEN}${full_bar}${RESET} ${BRIGHT_GREEN}100.0%${RESET} ${BRIGHT_BLUE}[${downloaded_mib}MiB/${total_mib}MiB]${RESET}"
-    else
-        progress_line="Downloading: ${GREEN}${full_bar}${RESET} ${YELLOW}${percent}%${RESET} ${BRIGHT_BLUE}[${downloaded_mib}MiB/${total_mib}MiB]${RESET}"
-    fi
-    
-    # Stats line
-    stats_line="ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET} | Location: ${MAGENTA}${DISPLAY_LOCATION}${RESET}"
-    
-    # Item line
-    item_line=""
-    if [ -n "$item_info" ]; then
-        item_line="Item: ${BRIGHT_CYAN}${item_info}${RESET}"
-    fi
-    
-    # Only update if lines changed (to reduce flickering)
-    if [ "$progress_line" != "$LAST_PROGRESS_LINE" ]; then
-        echo -ne "${CLEAR_LINE}${GOTO_COL1}${progress_line}"
-        LAST_PROGRESS_LINE="$progress_line"
-    fi
-    
-    echo -ne "\n${CLEAR_LINE}${GOTO_COL1}${stats_line}"
-    LAST_STATS_LINE="$stats_line"
-    
-    if [ -n "$item_line" ] && [ "$item_line" != "$LAST_ITEM_LINE" ]; then
-        echo -ne "\n${CLEAR_LINE}${GOTO_COL1}${item_line}"
-        LAST_ITEM_LINE="$item_line"
-        echo -ne "\033[2A"  # Move cursor up 2 lines
-    else
-        echo -ne "\033[1A"  # Move cursor up 1 line
-    fi
-}
-
-# Initialize with 0%
-update_progress_display "0.0" "0" "0" "--:--" "0.0KiB/s" ""
-
-# === CORE yt-dlp COMMAND ===
+# === CORE DOWNLOAD WITH INDIVIDUAL PROGRESS BARS ===
 DOWNLOAD_SUCCESS=false
 CURRENT_ITEM=0
 TOTAL_ITEMS=0
-ITEM_PROGRESS=0
-IN_ITEM=false
+VIDEO_COMPLETE=false
 
-# Use a temporary file to capture yt-dlp output
-TEMP_OUTPUT=$(mktemp)
-trap 'rm -f "$TEMP_OUTPUT"' EXIT
-
-# Run yt-dlp in background and capture output
-(
+# Run yt-dlp and parse output
+{
 yt-dlp \
     $PLAYLIST_FLAG \
     $MP3_FLAGS \
@@ -461,131 +403,85 @@ yt-dlp \
     --continue \
     --no-overwrites \
     --merge-output-format mp4 \
-    --progress \
     --newline \
     --no-warnings \
+    --progress \
     --output-na-placeholder "-" \
     "$URL" 2>&1
-) > "$TEMP_OUTPUT" &
-
-YTDLP_PID=$!
-
-# Process output in real-time
-while kill -0 $YTDLP_PID 2>/dev/null || [ -s "$TEMP_OUTPUT" ]; do
-    if read -r line 2>/dev/null < "$TEMP_OUTPUT"; then
-        # Remove the line from temp file
-        tail -n +2 "$TEMP_OUTPUT" > "${TEMP_OUTPUT}.tmp" && mv "${TEMP_OUTPUT}.tmp" "$TEMP_OUTPUT"
-        
-        # Parse playlist item info
-        if [[ "$line" =~ "Downloading item" ]]; then
-            if [[ "$line" =~ ([0-9]+)[[:space:]]+of[[:space:]]+([0-9]+) ]]; then
-                CURRENT_ITEM="${BASH_REMATCH[1]}"
-                TOTAL_ITEMS="${BASH_REMATCH[2]}"
-                IN_ITEM=true
-                ITEM_PROGRESS=0
-            fi
-            continue
+} | while IFS= read -r line || [[ -n "$line" ]]; do
+    
+    # Parse playlist item start
+    if [[ "$line" =~ "Downloading item" ]]; then
+        VIDEO_COMPLETE=false
+        if [[ "$line" =~ ([0-9]+)[[:space:]]+of[[:space:]]+([0-9]+) ]]; then
+            CURRENT_ITEM="${BASH_REMATCH[1]}"
+            TOTAL_ITEMS="${BASH_REMATCH[2]}"
+            echo ""
+            echo -e "${BRIGHT_CYAN}📥 Downloading item ${CURRENT_ITEM} of ${TOTAL_ITEMS}${RESET}"
         fi
-        
-        # Parse progress information (yt-dlp default progress format)
-        if [[ "$line" =~ \[download\]\ +([0-9.]+)%\ +of\ +~?[[:space:]]*([0-9.]+)([KMGT])iB\ +at\ +([0-9.]+)([KMGT]?)iB/s\ +ETA\ +([0-9:]+) ]]; then
-            percent="${BASH_REMATCH[1]}"
-            total="${BASH_REMATCH[2]}"
-            total_unit="${BASH_REMATCH[3]}"
-            speed="${BASH_REMATCH[4]}"
-            speed_unit="${BASH_REMATCH[5]}"
-            eta="${BASH_REMATCH[6]}"
-            
-            # Convert total to MiB
-            case "$total_unit" in
-                "K") total_mib=$(echo "scale=2; $total / 1024" | bc -l) ;;
-                "M") total_mib="$total" ;;
-                "G") total_mib=$(echo "scale=2; $total * 1024" | bc -l) ;;
-                "T") total_mib=$(echo "scale=2; $total * 1048576" | bc -l) ;;
-                *) total_mib="$total" ;;
-            esac
-            
-            # Calculate downloaded MiB
-            downloaded_mib=$(echo "scale=2; $total_mib * $percent / 100" | bc -l)
-            
-            # Format speed
-            speed_display="${speed}${speed_unit}iB/s"
-            
-            # Build item info
-            item_info=""
-            if [[ "$IS_PLAYLIST" == "true" ]] && $IN_ITEM; then
-                if [ $TOTAL_ITEMS -gt 0 ]; then
-                    item_info="Item ${CURRENT_ITEM} of ${TOTAL_ITEMS}"
-                else
-                    item_info="Item ${CURRENT_ITEM}"
-                fi
-            fi
-            
-            # Update progress display
-            update_progress_display "$percent" "$downloaded_mib" "$total_mib" "$eta" "$speed_display" "$item_info"
-            ITEM_PROGRESS=$percent
-            continue
-        fi
-        
-        # Parse completion
-        if [[ "$line" =~ \[download\]\ +100%.*of\ +~?[[:space:]]*([0-9.]+)([KMGT])iB\ +in\ +([0-9:]+) ]]; then
-            total="${BASH_REMATCH[1]}"
-            total_unit="${BASH_REMATCH[2]}"
-            eta="${BASH_REMATCH[3]}"
-            
-            # Convert total to MiB
-            case "$total_unit" in
-                "K") total_mib=$(echo "scale=2; $total / 1024" | bc -l) ;;
-                "M") total_mib="$total" ;;
-                "G") total_mib=$(echo "scale=2; $total * 1024" | bc -l) ;;
-                "T") total_mib=$(echo "scale=2; $total * 1048576" | bc -l) ;;
-                *) total_mib="$total" ;;
-            esac
-            
-            # Update progress display as complete
-            update_progress_display "100.0" "$total_mib" "$total_mib" "$eta" "Done" ""
-            IN_ITEM=false
-            continue
-        fi
-        
-        # Show metadata lines (but not progress lines)
-        if [[ "$line" =~ ^\[(download|youtube|info|ExtractAudio|Merger)\] ]] && \
-           ! [[ "$line" =~ ^\[download\].*([0-9.]+)% ]] && \
-           ! [[ "$line" =~ ^\[download\].*Downloading\ +item ]]; then
-            # Move cursor down to show metadata below progress bar
-            echo -ne "${SHOW_CURSOR}"
-            if $IN_ITEM && [ $(echo "$ITEM_PROGRESS >= 99" | bc -l) -eq 1 ]; then
-                echo -e "${CYAN}${line}${RESET}"
-            else
-                echo -e "${BLUE}${line}${RESET}"
-            fi
-            echo -ne "${HIDE_CURSOR}"
-            # Re-position cursor
-            if [ -n "$LAST_ITEM_LINE" ]; then
-                echo -ne "\033[3A"
-            else
-                echo -ne "\033[2A"
-            fi
-        fi
-    else
-        sleep 0.1
+        continue
     fi
+    
+    # Parse individual video progress
+    if [[ "$line" =~ \[download\]\ +([0-9.]+)%\ +of\ +~?[[:space:]]*([0-9.]+)([KMGT])iB\ +at\ +([0-9.]+)([KMGT]?)iB/s\ +ETA\ +([0-9:]+) ]]; then
+        percent="${BASH_REMATCH[1]}"
+        speed="${BASH_REMATCH[4]}${BASH_REMATCH[5]}iB/s"
+        eta="${BASH_REMATCH[6]}"
+        
+        # Show individual progress bar
+        if [[ "$IS_PLAYLIST" == "true" ]] && [ $TOTAL_ITEMS -gt 0 ]; then
+            show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed"
+        else
+            show_progress_bar "$percent" "1" "1" "$eta" "$speed"
+        fi
+        continue
+    fi
+    
+    # Parse download completion
+    if [[ "$line" =~ \[download\]\ +100%.*of\ +~?[[:space:]]*([0-9.]+)([KMGT])iB\ +in\ +([0-9:]+) ]] && ! $VIDEO_COMPLETE; then
+        echo -e "\r\033[K${BRIGHT_GREEN}✓ Video downloaded successfully${RESET}"
+        VIDEO_COMPLETE=true
+        continue
+    fi
+    
+    # Parse extraction/merging completion
+    if [[ "$line" =~ \[ExtractAudio\].*Destination: ]] || [[ "$line" =~ \[Merger\].*Merging.*into ]]; then
+        if ! $VIDEO_COMPLETE; then
+            echo -e "\r\033[K${BRIGHT_GREEN}✓ Processing completed${RESET}"
+            VIDEO_COMPLETE=true
+        fi
+        continue
+    fi
+    
+    # Show important info messages
+    if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]] || \
+       [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
+        echo -e "${BLUE}${line}${RESET}"
+        continue
+    fi
+    
+    # Show info messages (less verbose)
+    if [[ "$line" =~ ^\[(info|ExtractAudio|Merger)\] ]] && \
+       ! [[ "$line" =~ already\ in\ target\ format ]]; then
+        echo -e "${CYAN}${line}${RESET}"
+        continue
+    fi
+    
 done
 
-# Wait for yt-dlp to finish
-wait $YTDLP_PID
-YTDLP_EXIT=$?
+# Capture exit status
+EXIT_CODE=${PIPESTATUS[0]}
 
-# Show final progress
-update_progress_display "100.0" "0" "0" "--:--" "Complete" ""
-echo -e "${SHOW_CURSOR}"
+# Clear any leftover progress line
+echo -ne "\r\033[K"
 
-# Check if download was successful
-if [ $YTDLP_EXIT -eq 0 ] || [ $YTDLP_EXIT -eq 130 ]; then  # 130 is SIGINT (Ctrl+C)
+if [ $EXIT_CODE -eq 0 ]; then
     DOWNLOAD_SUCCESS=true
+    echo ""
+    echo -e "${BRIGHT_GREEN}✅ All downloads completed successfully!${RESET}"
 else
-    echo -e "\n${ORANGE}⚠️  Download exited with code $YTDLP_EXIT${RESET}"
-    DOWNLOAD_SUCCESS=false
+    echo ""
+    echo -e "${ORANGE}⚠️  Download process ended with code $EXIT_CODE${RESET}"
 fi
 
 echo ""
