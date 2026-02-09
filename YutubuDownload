@@ -447,9 +447,15 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
 
-# === FIXED yt-dlp COMMAND WITH GREEN PROGRESS BAR ===
+# === FIXED yt-dlp COMMAND WITH PROPER ARCHIVE HANDLING ===
 DOWNLOAD_SUCCESS=false
+ARCHIVE_VIDEO_DETECTED=""
+ARCHIVE_VIDEO_ID=""
+
 for ATTEMPT in 1 2 3; do
+    # Capture yt-dlp output
+    YT_DLP_OUTPUT=$(mktemp)
+    
     if yt-dlp \
         $PLAYLIST_FLAG \
         $MP3_FLAGS \
@@ -467,44 +473,28 @@ for ATTEMPT in 1 2 3; do
         --no-warnings \
         --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
         --output-na-placeholder "-" \
-        "$URL" 2>&1 | while IFS= read -r line; do
+        "$URL" 2>&1 | tee "$YT_DLP_OUTPUT" | while IFS= read -r line; do
         
         # Handle "already recorded in archive" messages during download
         if [[ "$line" =~ "has already been recorded in the archive" ]]; then
-            echo ""
-            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-            echo -e "${ORANGE}⚠️  ⚠️  ⚠️  VIDEO ALREADY IN ARCHIVE DETECTED  ⚠️  ⚠️  ⚠️${RESET}"
-            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-            echo ""
-            echo -e "   ${CYAN}Message:${RESET} $line"
-            echo -e "   ${ORANGE}⚠️  This video is in archive but file might be deleted${RESET}"
-            echo ""
-            echo -e "   ${CYAN}Options:${RESET}"
-            echo -e "     ${BRIGHT_GREEN}1${RESET} = Remove from archive & retry now"
-            echo -e "     ${BRIGHT_RED}2${RESET} = Skip and exit (run with --force-download next time)"
-            echo -n -e "   ${BRIGHT_CYAN}Your choice (1/2): ${RESET}"
-            read -r FORCE_CHOICE
-            FORCE_CHOICE=$(echo "${FORCE_CHOICE:-2}" | tr '[:upper:]' '[:lower:]')
-            echo ""
-            
-            if [[ "$FORCE_CHOICE" == "1" ]]; then
+            if [[ "$IS_PLAYLIST" == "true" ]]; then
+                # For playlists: Just skip this video and continue
+                echo -e "${ORANGE}⚠️  Skipping archived video in playlist...${RESET}"
+                
                 # Extract video ID from the line
                 if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
                     DETECTED_VID="${BASH_REMATCH[1]}"
-                    grep -vxF "$DETECTED_VID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
-                    mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-                    echo -e "${LIME}✅ DELETED $DETECTED_VID from archive.${RESET}"
-                    echo -e "${SKY_BLUE}🔄 Please run the script again to download.${RESET}"
-                else
-                    echo -e "${RED}❌ Could not extract video ID. Please run script with:${RESET}"
-                    echo -e "${CYAN}   ./YutubuDownload --force-download${RESET}"
+                    echo -e "${CYAN}   Video ID: $DETECTED_VID (already downloaded)${RESET}"
                 fi
+                continue
             else
-                echo -e "${LIME}✅ SKIPPED download per your choice.${RESET}"
-                echo -e "${CYAN}   To force download, run:${RESET}"
-                echo -e "${CYAN}   ./YutubuDownload --force-download${RESET}"
+                # For single videos: Save the video ID
+                if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
+                    ARCHIVE_VIDEO_ID="${BASH_REMATCH[1]}"
+                    ARCHIVE_VIDEO_DETECTED="true"
+                fi
+                # Continue processing to show the message
             fi
-            exit 0
         fi
         
         # Handle metadata lines - Color them!
@@ -553,14 +543,14 @@ for ATTEMPT in 1 2 3; do
         if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
             percent_int="${BASH_REMATCH[1]}"
             
-            # FIXED: Calculate downloaded MiB correctly
+            # Calculate downloaded MiB correctly
             if [[ "$downloaded" =~ ^[0-9]+$ ]] && [ "$downloaded" -gt 0 ]; then
                 dl_mib=$(( downloaded / 1048576 ))
             else
                 dl_mib=0
             fi
             
-            # FIXED: Calculate total MiB correctly  
+            # Calculate total MiB correctly  
             if [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
                 tot_mib=$(( total / 1048576 ))
             else
@@ -606,9 +596,54 @@ for ATTEMPT in 1 2 3; do
         fi
         
     done; then
+        # Check if we need to handle archive detection for single videos
+        if [[ "$ARCHIVE_VIDEO_DETECTED" == "true" && "$IS_PLAYLIST" == "false" ]]; then
+            echo ""
+            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+            echo -e "${ORANGE}⚠️  ⚠️  ⚠️  VIDEO ALREADY IN ARCHIVE DETECTED  ⚠️  ⚠️  ⚠️${RESET}"
+            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+            echo ""
+            echo -e "   ${CYAN}Video ID:${RESET} $ARCHIVE_VIDEO_ID"
+            echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
+            echo -e "   ${ORANGE}⚠️  Archive tracking prevents duplicate downloads${RESET}"
+            echo ""
+            echo -e "   ${CYAN}Options:${RESET}"
+            echo -e "     ${BRIGHT_GREEN}y${RESET} = YES → Delete from archive & re-download (file may be missing)"
+            echo -e "     ${BRIGHT_RED}n${RESET} = NO  → Skip download (safe default)"
+            echo -n -e "   ${BRIGHT_CYAN}Delete from archive and re-download? (y/N): ${RESET}"
+            read -r CHOICE </dev/tty
+            CHOICE=$(echo "${CHOICE:-n}" | tr '[:upper:]' '[:lower:]')
+            echo ""
+            
+            if [[ "$CHOICE" == "y" ]]; then
+                grep -vxF "$ARCHIVE_VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+                echo -e "${LIME}✅ DELETED $ARCHIVE_VIDEO_ID from archive.${RESET}"
+                echo -e "${SKY_BLUE}🔄 Please run the script again to download.${RESET}"
+            else
+                echo -e "${LIME}✅ SKIPPED download per your choice.${RESET}"
+                echo -e "${CYAN}   To force download next time, use:${RESET}"
+                echo -e "${CYAN}   ./YutubuDownload --force-download${RESET}"
+            fi
+            rm -f "$YT_DLP_OUTPUT"
+            exit 0
+        fi
+        
+        # If no archive issue, it was a successful download
         DOWNLOAD_SUCCESS=true
+        rm -f "$YT_DLP_OUTPUT"
         break
     else
+        # Check if failure was due to normal archive skipping in playlists
+        if [[ "$IS_PLAYLIST" == "true" ]] && grep -q "has already been recorded in the archive" "$YT_DLP_OUTPUT"; then
+            # This is normal behavior for playlists with archive tracking
+            echo -e "${LIME}✅ Playlist download completed (some videos were skipped as already downloaded)${RESET}"
+            DOWNLOAD_SUCCESS=true
+            rm -f "$YT_DLP_OUTPUT"
+            break
+        fi
+        
+        rm -f "$YT_DLP_OUTPUT"
         echo ""
         if [[ $ATTEMPT -lt 3 ]]; then
             print_error "⚠️  Attempt $ATTEMPT failed. Refreshing cookies..."
