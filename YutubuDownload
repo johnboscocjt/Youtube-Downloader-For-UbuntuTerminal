@@ -71,6 +71,15 @@ if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
     exit 0
 fi
 
+# Force download option
+if [[ "${1:-}" == "--force-download" ]] || [[ "${1:-}" == "-f" ]]; then
+    FORCE_DOWNLOAD="true"
+    # Remove the force flag from arguments
+    shift
+else
+    FORCE_DOWNLOAD="false"
+fi
+
 # === BADASS HACKER-STYLE GRADIENT BANNER ===
 {
   echo -e "\033[38;5;51m▖▖  ▗   ▌   ▄        ▜      ▌"
@@ -341,7 +350,7 @@ else
 fi
 echo ""
 
-# === BULLETPROOF ARCHIVE HANDLING ===
+# === ENHANCED ARCHIVE HANDLING WITH RE-DOWNLOAD OPTION ===
 VIDEO_ID=""
 if [[ "$URL" =~ (?:v=|youtu\.be/)([^&?/]{11}) ]]; then
     VIDEO_ID="${BASH_REMATCH[1]}"
@@ -352,40 +361,53 @@ fi
 ARCHIVE_FILE="$HOME/yt-downloads-archive.txt"
 ARCHIVE_FLAG=""
 
-if [[ "$IS_PLAYLIST" == "false" && -n "$VIDEO_ID" ]]; then
-    touch "$ARCHIVE_FILE" 2>/dev/null || true
-    
-    if grep -qxF "$VIDEO_ID" "$ARCHIVE_FILE" 2>/dev/null; then
-        echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-        echo -e "${ORANGE}⚠️  ⚠️  ⚠️  VIDEO ALREADY IN ARCHIVE  ⚠️  ⚠️  ⚠️${RESET}"
-        echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-        echo ""
-        echo -e "   ${CYAN}Video ID:${RESET} $VIDEO_ID"
-        echo -e "   ${ORANGE}⚠️  Archive only means yt-dlp *attempted* download before${RESET}"
-        echo -e "   ${ORANGE}⚠️  File might be MISSING or CORRUPTED!${RESET}"
-        echo ""
-        echo -e "   ${CYAN}Options:${RESET}"
-        echo -e "     ${BRIGHT_GREEN}y${RESET} = YES → Delete from archive + re-download"
-        echo -e "     ${BRIGHT_RED}n${RESET} = NO  → Skip download (safe default)"
-        echo -n -e "   ${BRIGHT_CYAN}Delete from archive and re-download? (y/N): ${RESET}"
-        read -r CHOICE
-        CHOICE=$(echo "${CHOICE:-n}" | tr '[:upper:]' '[:lower:]')
-        echo ""
-        
-        if [[ "$CHOICE" == "y" ]]; then
-            grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
-            mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-            echo -e "${LIME}✅ DELETED $VIDEO_ID from archive. Proceeding with fresh download...${RESET}"
-            echo ""
-        else
-            echo -e "${LIME}✅ SKIPPED download per your choice.${RESET}"
-            exit 0
-        fi
-    fi
-fi
-
 if [[ "$IS_PLAYLIST" == "true" ]]; then
     ARCHIVE_FLAG="--download-archive $ARCHIVE_FILE"
+elif [[ "$FORCE_DOWNLOAD" == "true" ]]; then
+    # Don't use archive for force download
+    ARCHIVE_FLAG=""
+    echo -e "${ORANGE}⚠️  Force download mode: Archive tracking disabled${RESET}"
+    echo ""
+else
+    # Check if video is already in archive
+    if [[ -n "$VIDEO_ID" ]]; then
+        touch "$ARCHIVE_FILE" 2>/dev/null || true
+        
+        if grep -qxF "$VIDEO_ID" "$ARCHIVE_FILE" 2>/dev/null; then
+            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+            echo -e "${ORANGE}⚠️  ⚠️  ⚠️  VIDEO ALREADY IN ARCHIVE  ⚠️  ⚠️  ⚠️${RESET}"
+            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+            echo ""
+            echo -e "   ${CYAN}Video ID:${RESET} $VIDEO_ID"
+            echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
+            echo -e "   ${ORANGE}⚠️  Archive tracking prevents duplicate downloads${RESET}"
+            echo ""
+            echo -e "   ${CYAN}Options:${RESET}"
+            echo -e "     ${BRIGHT_GREEN}y${RESET} = YES → Delete from archive + re-download (file may be missing)"
+            echo -e "     ${BRIGHT_RED}n${RESET} = NO  → Skip download (safe default)"
+            echo -n -e "   ${BRIGHT_CYAN}Delete from archive and re-download? (y/N): ${RESET}"
+            read -r CHOICE
+            CHOICE=$(echo "${CHOICE:-n}" | tr '[:upper:]' '[:lower:]')
+            echo ""
+            
+            if [[ "$CHOICE" == "y" ]]; then
+                grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+                echo -e "${LIME}✅ DELETED $VIDEO_ID from archive. Proceeding with fresh download...${RESET}"
+                echo ""
+                ARCHIVE_FLAG=""
+            else
+                echo -e "${LIME}✅ SKIPPED download per your choice.${RESET}"
+                echo -e "${CYAN}   To force download next time, use:${RESET}"
+                echo -e "${CYAN}   ./YutubuDownload --force-download${RESET}"
+                exit 0
+            fi
+        else
+            ARCHIVE_FLAG="--download-archive $ARCHIVE_FILE"
+        fi
+    else
+        ARCHIVE_FLAG="--download-archive $ARCHIVE_FILE"
+    fi
 fi
 
 # Execution summary
@@ -396,6 +418,7 @@ echo -e "${CYAN}URL:${RESET}          $URL"
 echo -e "${CYAN}Type:${RESET}         $( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}Playlist (ALL videos)${RESET}" || echo "${BRIGHT_BLUE}Single Video ONLY${RESET}" )"
 echo -e "${CYAN}Format:${RESET}       $( [[ "$IS_MP3" == "true" ]] && echo "${BRIGHT_MAGENTA}MP3 ($AUDIO_QUAL)${RESET}" || echo "${BRIGHT_BLUE}Video (max ${MAX_HEIGHT}p) WITH AUDIO${RESET}" )"
 echo -e "${CYAN}Destination:${RESET}  $( [[ "$USE_FOLDER" == "true" ]] && echo "${BRIGHT_YELLOW}$FOLDER_NAME${RESET}" || echo "${BRIGHT_YELLOW}Current directory${RESET}" )"
+echo -e "${CYAN}Archive:${RESET}      $( [[ -n "$ARCHIVE_FLAG" ]] && echo "${BRIGHT_GREEN}ENABLED${RESET}" || echo "${ORANGE}DISABLED${RESET}" )"
 echo -e "${CYAN}JS Runtime:${RESET}   $( [[ -n "$JS_RUNTIME" ]] && echo "${BRIGHT_GREEN}${JS_RUNTIME##*=}${RESET}" || echo "${ORANGE}None${RESET}" )"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
@@ -445,6 +468,44 @@ for ATTEMPT in 1 2 3; do
         --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
         --output-na-placeholder "-" \
         "$URL" 2>&1 | while IFS= read -r line; do
+        
+        # Handle "already recorded in archive" messages during download
+        if [[ "$line" =~ "has already been recorded in the archive" ]]; then
+            echo ""
+            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+            echo -e "${ORANGE}⚠️  ⚠️  ⚠️  VIDEO ALREADY IN ARCHIVE DETECTED  ⚠️  ⚠️  ⚠️${RESET}"
+            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+            echo ""
+            echo -e "   ${CYAN}Message:${RESET} $line"
+            echo -e "   ${ORANGE}⚠️  This video is in archive but file might be deleted${RESET}"
+            echo ""
+            echo -e "   ${CYAN}Options:${RESET}"
+            echo -e "     ${BRIGHT_GREEN}1${RESET} = Remove from archive & retry now"
+            echo -e "     ${BRIGHT_RED}2${RESET} = Skip and exit (run with --force-download next time)"
+            echo -n -e "   ${BRIGHT_CYAN}Your choice (1/2): ${RESET}"
+            read -r FORCE_CHOICE
+            FORCE_CHOICE=$(echo "${FORCE_CHOICE:-2}" | tr '[:upper:]' '[:lower:]')
+            echo ""
+            
+            if [[ "$FORCE_CHOICE" == "1" ]]; then
+                # Extract video ID from the line
+                if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
+                    DETECTED_VID="${BASH_REMATCH[1]}"
+                    grep -vxF "$DETECTED_VID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                    mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+                    echo -e "${LIME}✅ DELETED $DETECTED_VID from archive.${RESET}"
+                    echo -e "${SKY_BLUE}🔄 Please run the script again to download.${RESET}"
+                else
+                    echo -e "${RED}❌ Could not extract video ID. Please run script with:${RESET}"
+                    echo -e "${CYAN}   ./YutubuDownload --force-download${RESET}"
+                fi
+            else
+                echo -e "${LIME}✅ SKIPPED download per your choice.${RESET}"
+                echo -e "${CYAN}   To force download, run:${RESET}"
+                echo -e "${CYAN}   ./YutubuDownload --force-download${RESET}"
+            fi
+            exit 0
+        fi
         
         # Handle metadata lines - Color them!
         if [[ "$line" =~ ^\[ ]]; then
