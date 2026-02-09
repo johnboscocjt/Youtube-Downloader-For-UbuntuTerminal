@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.0.5 — NO ARCHIVE • SINGLE PROGRESS BAR • NO ERRORS
+# Version: 1.0.3 — Single progress bar fix
 
 set -euo pipefail
 
@@ -79,11 +79,11 @@ extract_video_id() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.0.5 (2026-02-10) • Tanzania-Optimized • NO ARCHIVE"
+    echo "YutubuDownload v1.0.3 (2026-02-10) • Tanzania-Optimized • SINGLE PROGRESS BAR"
     exit 0
 fi
 
-# Force download option
+# Force download option (kept for future use, but not needed now)
 if [[ "${1:-}" == "--force-download" ]] || [[ "${1:-}" == "-f" ]]; then
     FORCE_DOWNLOAD="true"
     shift
@@ -100,7 +100,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.5${RESET}"
+echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.3${RESET}"
 
 # === SMART COOKIE REFRESH (Tanzania-optimized) ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
@@ -180,27 +180,17 @@ else
 fi
 echo ""
 
-# === URL INPUT — SAFE TRIMMING ===
+# === USER INPUTS ===
+
+# URL
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${BRIGHT_CYAN}📥 URL INPUT${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${CYAN}Enter YouTube URL (video or playlist):${RESET}"
 echo -n -e "${BRIGHT_CYAN}> ${RESET}"
-
-read -r URL_RAW || { echo ""; exit 1; }
-
-# Trim whitespace safely
-URL=$(printf '%s' "$URL_RAW" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-
-if [[ -z "$URL" ]]; then
-    print_error "❌ No URL provided. Exiting."
-    exit 1
-fi
-
-if ! [[ "$URL" =~ ^https?:// ]]; then
-    print_error "❌ Invalid URL. Must start with https://"
-    exit 1
-fi
+read -r URL || { echo ""; exit 1; }
+URL=$(echo "$URL" | xargs)
+[[ -z "$URL" ]] && { print_error "❌ No URL provided. Exiting."; exit 1; }
 echo ""
 
 # Download type
@@ -358,31 +348,90 @@ echo -e "${CYAN}Resume/Skip:${RESET}   ${BRIGHT_GREEN}File-based (auto-resume & 
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
 
-# === PROGRESS BAR SETUP ===
+# === SINGLE PROGRESS BAR SETUP ===
 BAR_WIDTH=20
 CSI="\033["
 HIDE_CURSOR="${CSI}?25l"
 SHOW_CURSOR="${CSI}?25h"
 CLEAR_LINE="${CSI}2K"
 GOTO_COL1="${CSI}0G"
-UP_1="${CSI}1A"
-DOWN_1="${CSI}1B"
 
 echo -e "$HIDE_CURSOR"
-trap 'echo -e "${SHOW_CURSOR}"; echo -e "\r${CLEAR_LINE}${GOTO_COL1}"; echo -e "${UP_1}${CLEAR_LINE}${GOTO_COL1}"; exit' INT TERM EXIT
+trap 'echo -e "${SHOW_CURSOR}\n"; exit' INT TERM EXIT
 
 DISPLAY_LOCATION="${FOLDER_NAME:-Current directory}"
 
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-echo -e "${SKY_BLUE}Starting download...${RESET}"
+echo -e "${SKY_BLUE}Starting download... (single progress bar below)${RESET}"
+echo ""
 
-# === CORE yt-dlp COMMAND — WORKING PROGRESS ===
+# === CORE yt-dlp COMMAND — NO ARCHIVE ===
 DOWNLOAD_SUCCESS=false
+CURRENT_ITEM=0
+TOTAL_ITEMS=0
+
+# Function to print metadata lines without interfering with progress bar
+print_metadata() {
+    local line="$1"
+    if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]] || \
+       [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]] || \
+       [[ "$line" =~ ^\[download\].*Downloading.*item.*of ]]; then
+        echo -e "${BRIGHT_CYAN}$line${RESET}"
+    elif [[ "$line" =~ ^\[info\] ]]; then
+        echo -e "${BLUE}$line${RESET}"
+    elif [[ "$line" =~ ^\[ExtractAudio\] ]] || [[ "$line" =~ ^\[Merger\] ]]; then
+        echo -e "${BRIGHT_GREEN}$line${RESET}"
+    fi
+}
+
+# Function to update progress bar
+update_progress() {
+    local percent="$1"
+    local downloaded="$2"
+    local total="$3"
+    local eta="$4"
+    local speed="$5"
+    local item_info="$6"
+    
+    percent_int="${percent%.*}"
+    dl_mib=$(( downloaded / 1048576 ))
+    tot_mib=$(( total / 1048576 ))
+    
+    # Build progress bar
+    filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+    [ $filled -gt $BAR_WIDTH ] && filled=$BAR_WIDTH
+    bar=$(printf '█%.0s' $(seq 1 "$filled"))
+    empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+    full_bar="$bar$empty"
+    
+    # Clear and update progress line
+    echo -ne "${CLEAR_LINE}${GOTO_COL1}"
+    
+    # Different display for completed downloads
+    if [ "$percent_int" -ge 99 ]; then
+        printf "Downloading: ${GREEN}%s${RESET} ${BRIGHT_GREEN}100.0%%${RESET} ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
+            "$full_bar" "$dl_mib" "$tot_mib"
+    else
+        printf "Downloading: ${GREEN}%s${RESET} ${YELLOW}%s${RESET} ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
+            "$full_bar" "$percent" "$dl_mib" "$tot_mib"
+    fi
+    
+    echo -ne "\n${CLEAR_LINE}${GOTO_COL1}"
+    printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
+        "$eta" "$speed" "$DISPLAY_LOCATION"
+    
+    if [ -n "$item_info" ]; then
+        echo -ne "\n${CLEAR_LINE}${GOTO_COL1}"
+        printf "Item: ${BRIGHT_CYAN}%s${RESET}" "$item_info"
+        echo -ne "\033[2A"  # Move cursor up 2 lines
+    else
+        echo -ne "\033[1A"  # Move cursor up 1 line
+    fi
+}
 
 if yt-dlp \
-    --console-title \
     $PLAYLIST_FLAG \
     $MP3_FLAGS \
     -f "$FORMAT" \
@@ -400,55 +449,35 @@ if yt-dlp \
     --output-na-placeholder "-" \
     "$URL" 2>&1 | while IFS= read -r line; do
 
-    # Handle metadata lines
-    if [[ "$line" =~ ^\[(youtube|download)\] ]]; then
-        if [[ "$line" == *"[download] Downloading playlist:"* ]]; then
-            echo -e "${BRIGHT_MAGENTA}$line${RESET}"
-        elif [[ "$line" == *"[download] Downloading item "* ]]; then
-            echo -e "${BRIGHT_CYAN}$line${RESET}"
-        elif [[ "$line" == *"[ExtractAudio]"* ]] || [[ "$line" == *"[Merger]"* ]]; then
-            printf "\r${CLEAR_LINE}${GOTO_COL1}"
-            printf "\r${CLEAR_LINE}${GOTO_COL1}"
-            if [[ "$IS_MP3" == "true" ]]; then
-                echo -e "${BRIGHT_GREEN}➡️  Converting to MP3...${RESET}"
-            else
-                echo -e "${BRIGHT_GREEN}➡️  Merging audio/video...${RESET}"
-            fi
-        elif [[ "$line" == *"[youtube]"* ]] || [[ "$line" == *"[download]"* ]]; then
-            echo -e "${CYAN}$line${RESET}"
+    # Parse progress lines
+    if [[ "$line" =~ ^download:([0-9]+)\ ([0-9]+)\ ([0-9]+\.[0-9]+%?)\ ([0-9:-]*)\ (.*)$ ]]; then
+        downloaded="${BASH_REMATCH[1]}"
+        total="${BASH_REMATCH[2]}"
+        percent="${BASH_REMATCH[3]}"
+        eta="${BASH_REMATCH[4]}"
+        speed="${BASH_REMATCH[5]}"
+        
+        item_info=""
+        if [[ "$IS_PLAYLIST" == "true" ]] && [ $CURRENT_ITEM -gt 0 ]; then
+            item_info="Item $CURRENT_ITEM of $TOTAL_ITEMS"
         fi
+        
+        update_progress "$percent" "$downloaded" "$total" "$eta" "$speed" "$item_info"
         continue
     fi
-
-    # Process real progress lines
-    if [[ "$line" == download:* ]]; then
-        read -r _ downloaded total percent eta speed <<< "$line"
-        if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
-            percent_int="${BASH_REMATCH[1]}"
-            dl_mib=$(( downloaded / 1048576 ))
-            tot_mib=$(( total / 1048576 ))
-
-            filled=$(( (percent_int * BAR_WIDTH) / 100 ))
-            bar=$(printf '█%.0s' $(seq 1 "$filled"))
-            empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
-            full_bar="$bar$empty"
-
-            printf "\r${CLEAR_LINE}${GOTO_COL1}"
-            if [ "$percent_int" -ge 99 ]; then
-                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}\n" \
-                    "$full_bar" "100.0%" "$dl_mib" "$tot_mib"
-            else
-                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}\n" \
-                    "$full_bar" "$percent" "$dl_mib" "$tot_mib"
-            fi
-
-            printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
-                "$eta" "$speed" "$DISPLAY_LOCATION"
-            sleep 0.1
-        fi
-        continue
+    
+    # Parse playlist info
+    if [[ "$line" =~ "Downloading.*item.*of.*([0-9]+)" ]]; then
+        TOTAL_ITEMS="${BASH_REMATCH[1]}"
     fi
-
+    
+    if [[ "$line" =~ "Downloading item.*([0-9]+).*of" ]]; then
+        CURRENT_ITEM="${BASH_REMATCH[1]}"
+    fi
+    
+    # Print metadata lines
+    print_metadata "$line"
+    
 done; then
     DOWNLOAD_SUCCESS=true
 else
@@ -456,7 +485,8 @@ else
     [[ $EXIT_CODE -ne 0 ]] && echo -e "\n${ORANGE}⚠️  Download exited with code $EXIT_CODE${RESET}"
 fi
 
-echo -e "${SHOW_CURSOR}"
+# Clean up cursor
+echo -e "${SHOW_CURSOR}${CLEAR_LINE}${GOTO_COL1}\n"
 
 if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
@@ -482,13 +512,13 @@ printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} %-68s ${BRIGHT_GREEN
 printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Resume:${RESET} ${BRIGHT_GREEN}Smart (partial = resume, full = skip)${RESET}                             ${BRIGHT_GREEN}║${RESET}"
-printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Re-download?${RESET} ${BRIGHT_YELLOW}Just delete the file and run again!${RESET}                          ${BRIGHT_GREEN}║${RESET}"
 echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}    ${BRIGHT_CYAN}💡 TANZANIA TIPS:${RESET}                                                         ${BRIGHT_GREEN}║${RESET}"
 printf "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Single video? Script ${BRIGHT_GREEN}IGNORES ?list= params${RESET}                                 ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Audio missing? ${BRIGHT_YELLOW}Re-download at 720p${RESET} (most reliable streams)                 ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Bot errors? Script ${BRIGHT_GREEN}auto-refreshes cookies${RESET}                                  ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Slow network? ${BRIGHT_YELLOW}720p works 95% of time on Vodacom/Airtel${RESET}                       ${BRIGHT_GREEN}║${RESET}"
+printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Re-download?${RESET} ${BRIGHT_YELLOW}Just delete the file and run again!${RESET}                          ${BRIGHT_GREEN}║${RESET}"
 echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_MAGENTA}Enjoy your downloads! 🌍✨${RESET}                                                   ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)${RESET}                       ${BRIGHT_GREEN}║${RESET}"
