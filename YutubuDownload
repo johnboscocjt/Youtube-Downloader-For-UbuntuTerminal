@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.0.6 — Individual video progress bars
+# Version: 1.0.7 — Shows downloaded content titles
 
 set -euo pipefail
 
@@ -79,7 +79,7 @@ extract_video_id() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.0.6 (2026-02-10) • Tanzania-Optimized • INDIVIDUAL PROGRESS BARS"
+    echo "YutubuDownload v1.0.7 (2026-02-10) • Tanzania-Optimized • SHOWS TITLES"
     exit 0
 fi
 
@@ -100,7 +100,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.6${RESET}"
+echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.7${RESET}"
 
 # === SMART COOKIE REFRESH (Tanzania-optimized) ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
@@ -348,13 +348,14 @@ echo -e "${CYAN}Resume/Skip:${RESET}   ${BRIGHT_GREEN}File-based (auto-resume & 
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
 
-# Function to display individual progress bar
+# Function to display individual progress bar with title
 show_progress_bar() {
     local percent="$1"
     local current="$2"
     local total="$3"
     local eta="$4"
     local speed="$5"
+    local title="$6"
     
     local BAR_WIDTH=20
     local percent_int=$(printf "%.0f" "$percent")
@@ -366,15 +367,25 @@ show_progress_bar() {
     local bar=$(printf '█%.0s' $(seq 1 "$filled"))
     local empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
     
-    # Clear line and show progress
+    # Clear line and show progress with title
     echo -ne "\r\033[K"
     
+    # Truncate title if too long
+    local max_title_length=40
+    if [ ${#title} -gt $max_title_length ]; then
+        title="${title:0:$((max_title_length-3))}..."
+    fi
+    
     if [[ "$IS_PLAYLIST" == "true" ]] && [ "$total" != "1" ]; then
-        echo -ne "Item ${current}/${total}: ${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
+        echo -ne "Item ${current}/${total}: ${BRIGHT_CYAN}${title}${RESET}"
+        echo -ne "\n${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
         echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
+        echo -ne "\033[1A"  # Move cursor up 1 line
     else
-        echo -ne "Downloading: ${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
+        echo -ne "${BRIGHT_CYAN}${title}${RESET}"
+        echo -ne "\n${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
         echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
+        echo -ne "\033[1A"  # Move cursor up 1 line
     fi
 }
 
@@ -383,11 +394,12 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
 
-# === CORE DOWNLOAD WITH INDIVIDUAL PROGRESS BARS ===
+# === CORE DOWNLOAD WITH TITLE DISPLAY ===
 DOWNLOAD_SUCCESS=false
 CURRENT_ITEM=0
 TOTAL_ITEMS=0
 VIDEO_COMPLETE=false
+CURRENT_TITLE=""
 
 # Run yt-dlp and parse output
 {
@@ -413,11 +425,40 @@ yt-dlp \
     # Parse playlist item start
     if [[ "$line" =~ "Downloading item" ]]; then
         VIDEO_COMPLETE=false
+        CURRENT_TITLE=""  # Reset title for new video
         if [[ "$line" =~ ([0-9]+)[[:space:]]+of[[:space:]]+([0-9]+) ]]; then
             CURRENT_ITEM="${BASH_REMATCH[1]}"
             TOTAL_ITEMS="${BASH_REMATCH[2]}"
             echo ""
             echo -e "${BRIGHT_CYAN}📥 Downloading item ${CURRENT_ITEM} of ${TOTAL_ITEMS}${RESET}"
+        fi
+        continue
+    fi
+    
+    # Parse video title from yt-dlp info line
+    if [[ "$line" =~ ^\[youtube\].*Downloading\ +v[[:space:]]+([0-9]+)\ +of\ +([0-9]+) ]]; then
+        # This is a playlist item starting
+        continue
+    fi
+    
+    # Parse video title when it starts downloading
+    if [[ "$line" =~ ^\[download\]\ +Destination:\ +(.*)$ ]]; then
+        local dest="${BASH_REMATCH[1]}"
+        # Extract title from destination path
+        if [[ "$dest" =~ /([^/]+)\.[^./]+$ ]]; then
+            CURRENT_TITLE="${BASH_REMATCH[1]}"
+            # Remove playlist index prefix if present
+            CURRENT_TITLE=$(echo "$CURRENT_TITLE" | sed -E 's/^[0-9]{2,} - //')
+        fi
+        continue
+    fi
+    
+    # Parse video title from info line
+    if [[ "$line" =~ ^\[info\]\ +([^:]+):\ +Downloading ]]; then
+        CURRENT_TITLE="${BASH_REMATCH[1]}"
+        # Truncate if too long
+        if [ ${#CURRENT_TITLE} -gt 50 ]; then
+            CURRENT_TITLE="${CURRENT_TITLE:0:47}..."
         fi
         continue
     fi
@@ -428,41 +469,53 @@ yt-dlp \
         speed="${BASH_REMATCH[4]}${BASH_REMATCH[5]}iB/s"
         eta="${BASH_REMATCH[6]}"
         
-        # Show individual progress bar
+        # Use current title or default
+        local display_title="${CURRENT_TITLE:-Downloading...}"
+        
+        # Show individual progress bar with title
         if [[ "$IS_PLAYLIST" == "true" ]] && [ $TOTAL_ITEMS -gt 0 ]; then
-            show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed"
+            show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed" "$display_title"
         else
-            show_progress_bar "$percent" "1" "1" "$eta" "$speed"
+            show_progress_bar "$percent" "1" "1" "$eta" "$speed" "$display_title"
         fi
         continue
     fi
     
     # Parse download completion
     if [[ "$line" =~ \[download\]\ +100%.*of\ +~?[[:space:]]*([0-9.]+)([KMGT])iB\ +in\ +([0-9:]+) ]] && ! $VIDEO_COMPLETE; then
-        echo -e "\r\033[K${BRIGHT_GREEN}✓ Video downloaded successfully${RESET}"
+        echo -e "\r\033[K${BRIGHT_GREEN}✓ Downloaded:${RESET} ${BRIGHT_CYAN}${CURRENT_TITLE:-Video}${RESET}"
         VIDEO_COMPLETE=true
         continue
     fi
     
     # Parse extraction/merging completion
-    if [[ "$line" =~ \[ExtractAudio\].*Destination: ]] || [[ "$line" =~ \[Merger\].*Merging.*into ]]; then
-        if ! $VIDEO_COMPLETE; then
+    if ([[ "$line" =~ \[ExtractAudio\].*Destination: ]] || [[ "$line" =~ \[Merger\].*Merging.*into ]]) && ! $VIDEO_COMPLETE; then
+        # Try to extract title from the line
+        if [[ "$line" =~ \/([^/]+)\.[^./]+$ ]]; then
+            local file_title="${BASH_REMATCH[1]}"
+            file_title=$(echo "$file_title" | sed -E 's/^[0-9]{2,} - //')
+            echo -e "\r\033[K${BRIGHT_GREEN}✓ Processed:${RESET} ${BRIGHT_CYAN}${file_title}${RESET}"
+        else
             echo -e "\r\033[K${BRIGHT_GREEN}✓ Processing completed${RESET}"
-            VIDEO_COMPLETE=true
         fi
+        VIDEO_COMPLETE=true
         continue
     fi
     
-    # Show important info messages
-    if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]] || \
-       [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
+    # Show playlist info
+    if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]]; then
+        echo -e "${BRIGHT_MAGENTA}${line}${RESET}"
+        continue
+    fi
+    
+    # Show URL extraction info
+    if [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
         echo -e "${BLUE}${line}${RESET}"
         continue
     fi
     
-    # Show info messages (less verbose)
-    if [[ "$line" =~ ^\[(info|ExtractAudio|Merger)\] ]] && \
-       ! [[ "$line" =~ already\ in\ target\ format ]]; then
+    # Show format info
+    if [[ "$line" =~ ^\[info\].*Downloading.*format ]]; then
         echo -e "${CYAN}${line}${RESET}"
         continue
     fi
@@ -509,14 +562,14 @@ MODE_DISPLAY="$( [[ "$IS_PLAYLIST" == "true" ]] && echo "FULL PLAYLIST" || echo 
 printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} %-68s ${BRIGHT_GREEN}║${RESET}\n" "$MODE_DISPLAY"
 printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
-printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Resume:${RESET} ${BRIGHT_GREEN}Smart (partial = resume, full = skip)${RESET}                              ${BRIGHT_GREEN}║${RESET}"
+printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Resume:${RESET} ${BRIGHT_GREEN}Smart (partial = resume, full = skip)${RESET}                             ${BRIGHT_GREEN}║${RESET}"
 echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}║${RESET}    ${BRIGHT_CYAN}💡 TANZANIA TIPS:${RESET}                                                         ${BRIGHT_GREEN}║${RESET}"
 printf "${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Single video? Script ${BRIGHT_GREEN}IGNORES ?list= params${RESET}                                 ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Audio missing? ${BRIGHT_YELLOW}Re-download at 720p${RESET} (most reliable streams)                 ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Bot errors? Script ${BRIGHT_GREEN}auto-refreshes cookies${RESET}                                  ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}•${RESET} Slow network? ${BRIGHT_YELLOW}720p works 95% of time on Vodacom/Airtel${RESET}                       ${BRIGHT_GREEN}║${RESET}"
-printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Re-download?${RESET} ${BRIGHT_YELLOW}Just delete the file and run again!${RESET}                           ${BRIGHT_GREEN}║${RESET}"
+printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Re-download?${RESET} ${BRIGHT_YELLOW}Just delete the file and run again!${RESET}                          ${BRIGHT_GREEN}║${RESET}"
 echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_MAGENTA}Enjoy your downloads! 🌍✨${RESET}                                                   ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}Made with ❤️  for Tanzania by Johnbosco (Dar es Salaam)${RESET}                       ${BRIGHT_GREEN}║${RESET}"
@@ -525,7 +578,7 @@ echo -e "${BRIGHT_GREEN}╚═════════════════�
 echo ""
 
 # === SIGNATURE ===
-echo -e "\033[38;5;194m\"Out here doing some Alien things, Jesus is King...\" ~johnboscocjt(Isaiah 28:21)\033[0m"
+echo -e "\033[38;5;194m\"Out here doing some Alien things, Jesus is King...\" ~johnboscocjt (Isaiah 28:21)\033[0m"
 echo -e "\033[38;5;82m"
 cat << 'EOF'
                                     ¸¸,..--------------------.....,¸
