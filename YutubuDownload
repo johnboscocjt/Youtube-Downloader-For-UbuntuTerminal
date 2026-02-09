@@ -427,7 +427,12 @@ echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)
 # === FIXED yt-dlp COMMAND WITH GREEN PROGRESS BAR ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
-    if yt-dlp \
+    # Create a named pipe for progress output
+    PROGRESS_PIPE=$(mktemp -u)
+    mkfifo "$PROGRESS_PIPE"
+    
+    # Run yt-dlp in background and capture output
+    yt-dlp \
         $PLAYLIST_FLAG \
         $MP3_FLAGS \
         -f "$FORMAT" \
@@ -444,8 +449,13 @@ for ATTEMPT in 1 2 3; do
         --no-warnings \
         --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
         --output-na-placeholder "-" \
-        "$URL" 2>&1 | while IFS= read -r line; do
-        
+        --progress \
+        "$URL" 2>&1 | tee "$PROGRESS_PIPE" &
+    
+    YT_DLP_PID=$!
+    
+    # Process the output
+    while IFS= read -r line; do
         # Handle metadata lines - Color them!
         if [[ "$line" =~ ^\[ ]]; then
             # Color different types of metadata lines
@@ -467,8 +477,8 @@ for ATTEMPT in 1 2 3; do
             elif [[ "$line" =~ ^\[info\].*Downloading.*format ]]; then
                 # Format info
                 echo -e "${LIME}$line${RESET}"
-            elif [[ "$line" =~ ^\[download\] ]]; then
-                # Generic download messages
+            elif [[ "$line" =~ ^\[download\] && ! "$line" =~ progress ]]; then
+                # Generic download messages (but not progress)
                 echo -e "${BRIGHT_BLUE}$line${RESET}"
             elif [[ "$line" =~ ^\[youtube\] ]]; then
                 # Generic youtube messages
@@ -486,13 +496,18 @@ for ATTEMPT in 1 2 3; do
             continue
         fi
         
-        # Parse progress line - FIXED THIS SECTION
+        # Parse progress line - SIMPLIFIED VERSION
         if [[ "$line" =~ ^download: ]]; then
             # Extract the progress data
             read -r _ downloaded total percent eta speed <<< "$line"
             
-            # Clean the percent value
+            # Clean the values
+            downloaded="${downloaded:-0}"
+            total="${total:-0}"
             percent="${percent//%}"
+            percent="${percent:-0}"
+            eta="${eta:--}"
+            speed="${speed:-0.00KiB/s}"
             
             if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?$ ]]; then
                 percent_int="${BASH_REMATCH[1]}"
@@ -502,7 +517,7 @@ for ATTEMPT in 1 2 3; do
                     full_bar=$(printf '█%.0s' $(seq 1 $BAR_WIDTH))
                     percent_display="100.0%"
                     
-                    if [ -n "$total" ] && [ "$total" != "-" ] && [ "$total" != "NA" ]; then
+                    if [[ "$total" != "0" && "$total" != "-" && "$total" != "NA" ]]; then
                         # Convert bytes to MiB
                         dl_mib=$(( downloaded / 1048576 ))
                         tot_mib=$(( total / 1048576 ))
@@ -511,7 +526,7 @@ for ATTEMPT in 1 2 3; do
                         tot_mib=0
                     fi
                     
-                    # Use green status directly in printf
+                    # Show completion
                     printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
                     printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
                         "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
@@ -522,7 +537,7 @@ for ATTEMPT in 1 2 3; do
                     empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
                     full_bar="$bar$empty"
                     
-                    if [ -n "$total" ] && [ "$total" != "-" ] && [ "$total" != "NA" ]; then
+                    if [[ "$total" != "0" && "$total" != "-" && "$total" != "NA" ]]; then
                         # Convert bytes to MiB
                         dl_mib=$(( downloaded / 1048576 ))
                         tot_mib=$(( total / 1048576 ))
@@ -531,6 +546,7 @@ for ATTEMPT in 1 2 3; do
                         tot_mib=0
                     fi
                     
+                    # Show progress
                     printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
                     printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
                         "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
@@ -540,8 +556,6 @@ for ATTEMPT in 1 2 3; do
                 printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
                 printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
                     "$eta" "$speed" "$DISPLAY_LOCATION"
-                
-                sleep 0.1
             fi
         fi
         
@@ -557,7 +571,24 @@ for ATTEMPT in 1 2 3; do
             printf "Post-processing in progress... please wait"
         fi
         
-    done; then
+        # Check for "already been downloaded" message
+        if [[ "$line" =~ "has already been downloaded" ]]; then
+            printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Already Downloaded${RESET}${BRIGHT_BLUE}]${RESET}"
+            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "File already exists. Skipping download."
+        fi
+        
+    done < "$PROGRESS_PIPE" &
+    
+    # Wait for yt-dlp to finish
+    wait $YT_DLP_PID
+    YT_DLP_EXIT_CODE=$?
+    
+    # Clean up
+    rm -f "$PROGRESS_PIPE"
+    
+    if [[ $YT_DLP_EXIT_CODE -eq 0 ]] || [[ $YT_DLP_EXIT_CODE -eq 1 ]]; then
         DOWNLOAD_SUCCESS=true
         break
     else
