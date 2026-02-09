@@ -81,88 +81,36 @@ extract_video_id() {
     echo "$video_id"
 }
 
-# Function to get video title from ID
-get_video_title() {
-    local video_id="$1"
-    local title=""
-    
-    if [[ -n "$video_id" ]]; then
-        # Use cookies for better success rate
-        title=$(timeout 10 yt-dlp --cookies-from-browser chrome --get-title "https://youtu.be/$video_id" 2>/dev/null | head -n1 || echo "Unknown Title")
-        title=$(echo "$title" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 80)
-        [[ -z "$title" || "$title" == "Unknown Title" ]] && title="[Title Unavailable - Requires Login]"
-    fi
-    
-    echo "$title"
-}
-
-# Function to process archived videos for playlist
+# Function to process archived videos for playlist - SIMPLIFIED VERSION
 process_playlist_archive() {
     local url="$1"
     local archive_file="$2"
     
-    echo -e "${SKY_BLUE}🔄 Analyzing playlist for archived videos...${RESET}"
-    echo -e "${CYAN}This may take a moment depending on playlist size...${RESET}"
+    echo -e "${SKY_BLUE}🔄 Checking playlist for archived videos...${RESET}"
     
-    # Create a temporary file to store video IDs
-    local temp_ids_file=$(mktemp)
+    # First, try to get playlist ID from URL
+    local playlist_id=""
+    if [[ "$url" =~ list=([^&]+) ]]; then
+        playlist_id="${BASH_REMATCH[1]}"
+    fi
     
-    # Get all video IDs in the playlist - USE SIMPLE APPROACH
-    echo -e "${SKY_BLUE}Fetching playlist data...${RESET}"
-    
-    # Try different methods to get playlist IDs
+    # Try to get video IDs from playlist (limit to 50 to avoid timeouts)
     local all_video_ids=""
     
-    # Method 1: Try with cookies first (timeout 30 seconds)
-    timeout 30 yt-dlp \
+    echo -e "${CYAN}Fetching playlist video IDs...${RESET}"
+    
+    # Method 1: Quick fetch with timeout
+    all_video_ids=$(timeout 15 yt-dlp \
         --cookies-from-browser chrome \
         --yes-playlist \
         --get-id \
         --quiet \
         --no-warnings \
-        "$url" > "$temp_ids_file" 2>/dev/null
-    
-    # Check if we got any IDs
-    if [[ -s "$temp_ids_file" ]]; then
-        all_video_ids=$(cat "$temp_ids_file" | head -n 100)
-        echo -e "${LIME}✅ Fetched playlist with authentication${RESET}"
-    else
-        # Method 2: Try without cookies
-        echo -e "${ORANGE}⚠️  Trying without authentication...${RESET}"
-        timeout 20 yt-dlp \
-            --yes-playlist \
-            --get-id \
-            --quiet \
-            --no-warnings \
-            "$url" > "$temp_ids_file" 2>/dev/null
-        
-        if [[ -s "$temp_ids_file" ]]; then
-            all_video_ids=$(cat "$temp_ids_file" | head -n 50)
-            echo -e "${LIME}✅ Fetched playlist without authentication${RESET}"
-        else
-            # Method 3: Last resort - use yt-dlp with --flat-playlist
-            echo -e "${ORANGE}⚠️  Trying flat playlist method...${RESET}"
-            timeout 15 yt-dlp \
-                --yes-playlist \
-                --flat-playlist \
-                --print "%(id)s" \
-                --quiet \
-                --no-warnings \
-                "$url" > "$temp_ids_file" 2>/dev/null
-            
-            if [[ -s "$temp_ids_file" ]]; then
-                all_video_ids=$(cat "$temp_ids_file" | head -n 30)
-                echo -e "${LIME}✅ Fetched playlist with flat method${RESET}"
-            fi
-        fi
-    fi
-    
-    # Clean up temp file
-    rm -f "$temp_ids_file" 2>/dev/null || true
+        --playlist-end 50 \
+        "$url" 2>/dev/null || echo "")
     
     if [[ -z "$all_video_ids" ]]; then
-        echo -e "${ORANGE}⚠️  Could not fetch playlist info. Will proceed with normal download.${RESET}"
-        echo -e "${CYAN}Tip: Some playlists require login to view.${RESET}"
+        echo -e "${ORANGE}⚠️  Could not fetch playlist. Using archive check during download.${RESET}"
         return
     fi
     
@@ -170,29 +118,37 @@ process_playlist_archive() {
     video_count=$(echo "$all_video_ids" | wc -l)
     echo -e "${LIME}✅ Found $video_count videos in playlist${RESET}"
     
-    # Check archive for each video
+    # Check which videos are in archive
     local archived_videos=()
-    local total_checked=0
+    local archived_count=0
     
-    echo -e "${SKY_BLUE}Checking archive...${RESET}"
+    echo -e "${CYAN}Checking archive file...${RESET}"
     
+    # Read archive file once
+    if [[ ! -f "$archive_file" ]] || [[ ! -s "$archive_file" ]]; then
+        echo -e "${BRIGHT_GREEN}✅ Archive file is empty. All videos will be downloaded.${RESET}"
+        return
+    fi
+    
+    # Load archive into array for faster lookup
+    mapfile -t archive_array < "$archive_file" 2>/dev/null || true
+    
+    # Check each video ID against archive
     while IFS= read -r video_id; do
         [[ -z "$video_id" ]] && continue
-        ((total_checked++))
         
-        echo -ne "${CYAN}Checking video $total_checked/$video_count...${RESET}\r"
-        
-        if grep -qxF "$video_id" "$archive_file" 2>/dev/null; then
-            archived_videos+=("$video_id")
-        fi
+        # Check if video_id is in archive array
+        for archived_id in "${archive_array[@]}"; do
+            if [[ "$archived_id" == "$video_id" ]]; then
+                archived_videos+=("$video_id")
+                ((archived_count++))
+                break
+            fi
+        done
     done <<< "$all_video_ids"
     
-    echo -e "${CLEAR_LINE}${GOTO_COL1}${LIME}✅ Archive check complete${RESET}"
-    
-    local archived_count=${#archived_videos[@]}
-    
     if [[ $archived_count -eq 0 ]]; then
-        echo -e "${BRIGHT_GREEN}✅ No videos in archive. All $video_count videos will be downloaded.${RESET}"
+        echo -e "${BRIGHT_GREEN}✅ No archived videos found. All $video_count videos will be downloaded.${RESET}"
         return
     fi
     
@@ -207,14 +163,8 @@ process_playlist_archive() {
     local index=1
     
     for video_id in "${archived_videos[@]}"; do
-        local video_title
-        echo -ne "${SKY_BLUE}Getting title for video $index of $archived_count...${RESET}\r"
-        video_title=$(get_video_title "$video_id")
-        echo -e "${CLEAR_LINE}${GOTO_COL1}"
-        
         echo -e "${BRIGHT_BLUE}Video $index of $archived_count:${RESET}"
-        echo -e "  ${CYAN}ID:${RESET} $video_id"
-        echo -e "  ${CYAN}Title:${RESET} $video_title"
+        echo -e "  ${CYAN}Video ID:${RESET} $video_id"
         echo ""
         echo -e "  ${CYAN}Options:${RESET}"
         echo -e "    ${BRIGHT_GREEN}r${RESET} = RE-DOWNLOAD (remove from archive)"
@@ -229,7 +179,7 @@ process_playlist_archive() {
         case "$choice" in
             r)
                 videos_to_remove+=("$video_id")
-                echo -e "  ${LIME}✅ Will re-download '$video_title'${RESET}"
+                echo -e "  ${LIME}✅ Will re-download video: $video_id${RESET}"
                 ;;
             a)
                 # Apply to all remaining
@@ -260,7 +210,7 @@ process_playlist_archive() {
                 ;;
             *)
                 videos_to_keep+=("$video_id")
-                echo -e "  ${LIME}✅ Will skip '$video_title'${RESET}"
+                echo -e "  ${LIME}✅ Will skip video: $video_id${RESET}"
                 ;;
         esac
         
@@ -274,11 +224,23 @@ process_playlist_archive() {
         
         # Create temp archive without removed videos
         local temp_archive="${archive_file}.temp"
-        cp "$archive_file" "$temp_archive" 2>/dev/null || touch "$temp_archive"
         
-        for video_id in "${videos_to_remove[@]}"; do
-            grep -vxF "$video_id" "$temp_archive" > "${temp_archive}.tmp" 2>/dev/null || true
-            [[ -f "${temp_archive}.tmp" ]] && mv "${temp_archive}.tmp" "$temp_archive"
+        # Start with empty file
+        > "$temp_archive"
+        
+        # Keep all videos except those marked for removal
+        for archived_id in "${archive_array[@]}"; do
+            local keep_this=true
+            for remove_id in "${videos_to_remove[@]}"; do
+                if [[ "$archived_id" == "$remove_id" ]]; then
+                    keep_this=false
+                    break
+                fi
+            done
+            
+            if [[ "$keep_this" == "true" ]]; then
+                echo "$archived_id" >> "$temp_archive"
+            fi
         done
         
         mv "$temp_archive" "$archive_file" 2>/dev/null || true
@@ -588,16 +550,11 @@ if [[ "$IS_PLAYLIST" == "false" ]]; then
     VIDEO_ID=$(extract_video_id "$URL")
     
     if [[ -n "$VIDEO_ID" ]] && grep -qxF "$VIDEO_ID" "$ARCHIVE_FILE" 2>/dev/null; then
-        # Get video title
-        echo -e "${SKY_BLUE}🔄 Getting video title...${RESET}"
-        VIDEO_TITLE=$(get_video_title "$VIDEO_ID")
-        
         echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
         echo -e "${ORANGE}⚠️  ⚠️  ⚠️  VIDEO ALREADY IN ARCHIVE  ⚠️  ⚠️  ⚠️${RESET}"
         echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
         echo ""
         echo -e "   ${CYAN}Video ID:${RESET} $VIDEO_ID"
-        echo -e "   ${CYAN}Video Title:${RESET} $VIDEO_TITLE"
         echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
         echo ""
         
@@ -616,10 +573,10 @@ if [[ "$IS_PLAYLIST" == "false" ]]; then
             if [[ "$CHOICE" == "y" ]]; then
                 grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
                 mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-                echo -e "${LIME}✅ DELETED '$VIDEO_TITLE' from archive. Proceeding with fresh download...${RESET}"
+                echo -e "${LIME}✅ DELETED video $VIDEO_ID from archive. Proceeding with fresh download...${RESET}"
                 echo ""
             else
-                echo -e "${LIME}✅ SKIPPED '$VIDEO_TITLE' per your choice.${RESET}"
+                echo -e "${LIME}✅ SKIPPED video $VIDEO_ID per your choice.${RESET}"
                 exit 0
             fi
         fi
