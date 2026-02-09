@@ -455,6 +455,8 @@ ANY_VIDEO_DOWNLOADED=false
 VIDEO_SKIPPED=false
 EXIT_DOWNLOAD=false
 RE_DOWNLOAD_VIDEO=""
+ARCHIVE_VIDEO_ID=""
+DECISION_RESULT=0
 
 # Function to run yt-dlp with proper archive handling
 run_ytdlp() {
@@ -512,7 +514,6 @@ handle_archive_decision() {
                 echo -e "${LIME}✅ REMOVED $video_id from archive${RESET}"
                 echo -e "${SKY_BLUE}🔄 This video will be downloaded NOW${RESET}"
                 echo ""
-                RE_DOWNLOAD_VIDEO="$video_id"
                 return 2  # Re-download
                 ;;
             x)
@@ -521,7 +522,6 @@ handle_archive_decision() {
                 ;;
             *)
                 echo -e "${LIME}✅ SKIPPING $video_id (continuing with playlist)${RESET}"
-                VIDEO_SKIPPED=true
                 echo ""
                 return 1  # Skip
                 ;;
@@ -542,7 +542,6 @@ handle_archive_decision() {
             echo -e "${LIME}✅ REMOVED $video_id from archive${RESET}"
             echo -e "${SKY_BLUE}🔄 Continuing with download...${RESET}"
             echo ""
-            RE_DOWNLOAD_VIDEO="$video_id"
             return 2  # Re-download
         else
             echo -e "${LIME}✅ SKIPPED download per your choice${RESET}"
@@ -611,6 +610,10 @@ for ATTEMPT in 1 2 3; do
             DOWNLOAD_SUCCESS=true
             ANY_VIDEO_DOWNLOADED=true
             break
+        else
+            echo ""
+            print_error "⚠️  Re-download attempt failed"
+            break
         fi
     else
         # Normal download with archive
@@ -618,17 +621,17 @@ for ATTEMPT in 1 2 3; do
             # Check for archive messages
             if [[ "$line" =~ "has already been recorded in the archive" ]]; then
                 if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
-                    local video_id="${BASH_REMATCH[1]}"
-                    handle_archive_decision "$video_id" "$IS_PLAYLIST"
-                    local decision=$?
+                    ARCHIVE_VIDEO_ID="${BASH_REMATCH[1]}"
+                    handle_archive_decision "$ARCHIVE_VIDEO_ID" "$IS_PLAYLIST"
+                    DECISION_RESULT=$?
                     
-                    case $decision in
+                    case $DECISION_RESULT in
                         1)  # Skip
                             VIDEO_SKIPPED=true
                             continue
                             ;;
                         2)  # Re-download
-                            RE_DOWNLOAD_VIDEO="$video_id"
+                            RE_DOWNLOAD_VIDEO="$ARCHIVE_VIDEO_ID"
                             break 2  # Break out of while loop to restart download
                             ;;
                         3)  # Exit
