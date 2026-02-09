@@ -345,77 +345,62 @@ else
 fi
 echo ""
 
-# =============================================
-# FIXED ARCHIVE HANDLING - SIMPLE & WORKING
-# =============================================
+# Archive handling
+VIDEO_ID=""
+if [[ "$URL" =~ (?:v=|youtu\.be/)([^&?/]{11}) ]]; then
+    VIDEO_ID="${BASH_REMATCH[1]}"
+elif [[ "$URL" =~ youtube\.com/embed/([^/?&]{11}) ]]; then
+    VIDEO_ID="${BASH_REMATCH[1]}"
+fi
 
 ARCHIVE_FILE="$HOME/yt-downloads-archive.txt"
-mkdir -p "$(dirname "$ARCHIVE_FILE")" 2>/dev/null || true
-touch "$ARCHIVE_FILE" 2>/dev/null || true
+ARCHIVE_FLAG=""
 
-ARCHIVE_FLAG="--download-archive \"$ARCHIVE_FILE\""
-
-# ─── Single video mode ───────────────────────────────────────────
-if [[ "$IS_PLAYLIST" == "false" ]]; then
-
-    VIDEO_ID=""
-    if [[ "$URL" =~ (?:v=|youtu\.be/)([a-zA-Z0-9_-]{11}) ]]; then
-        VIDEO_ID="${BASH_REMATCH[1]}"
-    fi
-
-    if [[ -n "$VIDEO_ID" ]] && grep -qxF "$VIDEO_ID" "$ARCHIVE_FILE" 2>/dev/null; then
-
-        echo -e "\n${ORANGE}⚠️  Video already marked as downloaded in archive${RESET}"
-        echo -e "   ID: ${CYAN}$VIDEO_ID${RESET}\n"
-
-        echo -e "  ${BRIGHT_GREEN}r${RESET} = Re-download (remove from archive)"
-        echo -e "  ${BRIGHT_YELLOW}s${RESET} = Skip (do nothing)"
-        echo -e "  ${BRIGHT_RED}x${RESET} = Exit script"
-        echo -n -e "\n${BRIGHT_CYAN}Choice [r/s/x] → ${RESET}"
-
-        # Most reliable way to read from real terminal
-        choice=""
-        if [[ -t 0 ]]; then
-            read -r choice
-        else
-            # fallback when stdin is not terminal
-            read -r choice < /dev/tty 2>/dev/null || {
-                echo -e "${YELLOW}Cannot read choice interactively — defaulting to skip${RESET}"
-                choice="s"
-            }
-        fi
-
-        choice=$(echo "${choice:-s}" | tr '[:upper:]' '[:lower:]' | sed 's/[^rsx]//g' | head -c1)
-
-        echo ""
-
-        case "$choice" in
-            r)
-                echo -e "${LIME}→ Removing from archive → will re-download${RESET}\n"
-                sed -i "/^$VIDEO_ID$/d" "$ARCHIVE_FILE" 2>/dev/null || {
-                    grep -vF "$VIDEO_ID" "$ARCHIVE_FILE" > "$ARCHIVE_FILE.tmp" && mv "$ARCHIVE_FILE.tmp" "$ARCHIVE_FILE"
-                }
-                ARCHIVE_FLAG=""  # Don't use archive for re-download
-                ;;
-            x)
-                echo -e "${RED}→ Exiting as requested${RESET}"
-                exit 0
-                ;;
-            *)
-                echo -e "${YELLOW}→ Skipping this video${RESET}"
-                exit 0
-                ;;
-        esac
-
-    fi
-
-# ─── Playlist mode ───────────────────────────────────────────────
+if [[ "$IS_PLAYLIST" == "true" ]]; then
+    ARCHIVE_FLAG="--download-archive $ARCHIVE_FILE"
+elif [[ "$FORCE_DOWNLOAD" == "true" ]]; then
+    ARCHIVE_FLAG=""
+    echo -e "${ORANGE}⚠️  Force download mode: Archive tracking disabled${RESET}"
+    echo ""
 else
-
-    echo -e "${SKY_BLUE}Playlist mode:${RESET} using archive → already processed videos will be skipped automatically"
-    echo -e "  (to force re-download specific videos → edit or remove lines from)"
-    echo -e "   ${CYAN}$ARCHIVE_FILE${RESET}\n"
-
+    if [[ -n "$VIDEO_ID" ]]; then
+        touch "$ARCHIVE_FILE" 2>/dev/null || true
+        
+        if grep -qxF "$VIDEO_ID" "$ARCHIVE_FILE" 2>/dev/null; then
+            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+            echo -e "${ORANGE}⚠️  ⚠️  ⚠️  VIDEO ALREADY IN ARCHIVE  ⚠️  ⚠️  ⚠️${RESET}"
+            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+            echo ""
+            echo -e "   ${CYAN}Video ID:${RESET} $VIDEO_ID"
+            echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
+            echo -e "   ${ORANGE}⚠️  Archive tracking prevents duplicate downloads${RESET}"
+            echo ""
+            echo -e "   ${CYAN}Options:${RESET}"
+            echo -e "     ${BRIGHT_GREEN}y${RESET} = YES → Delete from archive + re-download"
+            echo -e "     ${BRIGHT_RED}n${RESET} = NO  → Skip download"
+            echo -n -e "   ${BRIGHT_CYAN}Delete from archive and re-download? (y/N): ${RESET}"
+            read -r CHOICE
+            CHOICE=$(echo "${CHOICE:-n}" | tr '[:upper:]' '[:lower:]')
+            echo ""
+            
+            if [[ "$CHOICE" == "y" ]]; then
+                grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+                echo -e "${LIME}✅ DELETED $VIDEO_ID from archive. Proceeding with fresh download...${RESET}"
+                echo ""
+                ARCHIVE_FLAG=""
+            else
+                echo -e "${LIME}✅ SKIPPED download per your choice.${RESET}"
+                echo -e "${CYAN}   To force download next time, use:${RESET}"
+                echo -e "${CYAN}   ./YutubuDownload --force-download${RESET}"
+                exit 0
+            fi
+        else
+            ARCHIVE_FLAG="--download-archive $ARCHIVE_FILE"
+        fi
+    else
+        ARCHIVE_FLAG="--download-archive $ARCHIVE_FILE"
+    fi
 fi
 
 # Execution summary
@@ -451,13 +436,15 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
 
-# =============================================
-# SIMPLE DOWNLOAD EXECUTION - NO COMPLEX LOGIC
-# =============================================
+# === SIMPLE, WORKING DOWNLOAD LOGIC ===
 DOWNLOAD_SUCCESS=false
+ANY_VIDEO_DOWNLOADED=false
 
 for ATTEMPT in 1 2 3; do
-    if eval yt-dlp \
+    # Clear any previous archive decisions
+    unset SKIP_VIDEO_ID 2>/dev/null || true
+    
+    if yt-dlp \
         $PLAYLIST_FLAG \
         $MP3_FLAGS \
         -f "$FORMAT" \
@@ -475,6 +462,88 @@ for ATTEMPT in 1 2 3; do
         --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
         --output-na-placeholder "-" \
         "$URL" 2>&1 | while IFS= read -r line; do
+        
+        # Handle "already recorded in archive" messages - SIMPLE VERSION
+        if [[ "$line" =~ "has already been recorded in the archive" ]]; then
+            if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
+                VIDEO_ID="${BASH_REMATCH[1]}"
+                
+                echo ""
+                echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                echo -e "${ORANGE}⚠️  VIDEO ALREADY IN ARCHIVE DETECTED  ⚠️${RESET}"
+                echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                echo ""
+                echo -e "   ${CYAN}Video ID:${RESET} $VIDEO_ID"
+                echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
+                echo ""
+                
+                if [[ "$IS_PLAYLIST" == "true" ]]; then
+                    echo -e "   ${CYAN}Options for PLAYLIST:${RESET}"
+                    echo -e "     ${BRIGHT_GREEN}s${RESET} = SKIP this video (continue with playlist)"
+                    echo -e "     ${BRIGHT_BLUE}r${RESET} = RE-DOWNLOAD (remove from archive)"
+                    echo -e "     ${BRIGHT_RED}x${RESET} = EXIT (stop entire download)"
+                    echo -n -e "   ${BRIGHT_CYAN}Your choice (s/r/x) [default=s]: ${RESET}"
+                    read -r CHOICE </dev/tty
+                    CHOICE=$(echo "${CHOICE:-s}" | tr '[:upper:]' '[:lower:]')
+                    echo ""
+                    
+                    case "$CHOICE" in
+                        r)
+                            grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                            mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+                            echo -e "${LIME}✅ REMOVED $VIDEO_ID from archive${RESET}"
+                            echo -e "${SKY_BLUE}🔄 This video will be downloaded NOW${RESET}"
+                            echo ""
+                            # Just continue - yt-dlp will retry this video
+                            ;;
+                        x)
+                            echo -e "${LIME}✅ Stopping playlist download per your choice${RESET}"
+                            echo -e "${SHOW_CURSOR}"
+                            exit 0
+                            ;;
+                        *)
+                            echo -e "${LIME}✅ SKIPPING $VIDEO_ID (continuing with playlist)${RESET}"
+                            echo ""
+                            SKIP_VIDEO_ID="$VIDEO_ID"
+                            ;;
+                    esac
+                else
+                    # SINGLE VIDEO MODE
+                    echo -e "   ${CYAN}Options for SINGLE VIDEO:${RESET}"
+                    echo -e "     ${BRIGHT_GREEN}r${RESET} = RE-DOWNLOAD (remove from archive)"
+                    echo -e "     ${BRIGHT_RED}s${RESET} = SKIP (exit without downloading)"
+                    echo -n -e "   ${BRIGHT_CYAN}Your choice (r/s) [default=r]: ${RESET}"
+                    read -r CHOICE </dev/tty
+                    CHOICE=$(echo "${CHOICE:-r}" | tr '[:upper:]' '[:lower:]')
+                    echo ""
+                    
+                    if [[ "$CHOICE" == "r" ]]; then
+                        grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                        mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+                        echo -e "${LIME}✅ REMOVED $VIDEO_ID from archive${RESET}"
+                        echo -e "${SKY_BLUE}🔄 Continuing with download...${RESET}"
+                        echo ""
+                        # Continue - yt-dlp will retry
+                    else
+                        echo -e "${LIME}✅ SKIPPED download per your choice${RESET}"
+                        echo -e "${SHOW_CURSOR}"
+                        exit 0
+                    fi
+                fi
+            fi
+            # Skip showing the archive message line
+            continue
+        fi
+        
+        # Skip lines for skipped videos in playlist
+        if [[ -n "$SKIP_VIDEO_ID" ]] && [[ "$line" =~ \[download\].*$SKIP_VIDEO_ID ]]; then
+            continue
+        fi
+        
+        # Check if this is a download progress line
+        if [[ "$line" =~ ^download: ]] || [[ "$line" =~ \[download\]\ Downloading ]]; then
+            ANY_VIDEO_DOWNLOADED=true
+        fi
         
         # Handle metadata lines
         if [[ "$line" =~ ^\[ ]]; then
@@ -564,8 +633,8 @@ done
 # Show cursor again
 echo -e "${SHOW_CURSOR}"
 
-# Show completion message
-if [[ "$DOWNLOAD_SUCCESS" == true ]]; then
+# Show completion message if something was downloaded
+if [[ "$ANY_VIDEO_DOWNLOADED" == "true" ]] || [[ "$DOWNLOAD_SUCCESS" == true ]]; then
     echo ""
     echo -e "${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${RESET}"
     echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
@@ -587,16 +656,6 @@ if [[ "$DOWNLOAD_SUCCESS" == true ]]; then
     echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
     echo -e "${BRIGHT_GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${RESET}"
     echo ""
-else
-    echo ""
-    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-    print_error "❌ DOWNLOAD FAILED AFTER 3 ATTEMPTS"
-    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-    echo -e "${CYAN}   💡 TANZANIA FIX:${RESET}"
-    echo -e "     1. Disconnect WiFi/Ethernet"
-    echo -e "     2. Wait 10 seconds"
-    echo -e "     3. Reconnect and retry"
-    exit 1
 fi
 
 # Signature
