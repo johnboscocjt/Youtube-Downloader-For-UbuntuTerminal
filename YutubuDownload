@@ -580,7 +580,7 @@ else
     FOLDER_CHOICE="${FOLDER_CHOICE:-n}"
     FOLDER_CHOICE=$(echo "$FOLDER_CHOICE" | xargs | tr '[:upper:]' '[:lower:]')
    
-    if [[ "${FOLDER_CHOICE" == "y" ]]; then
+    if [[ "${FOLDER_CHOICE}" == "y" ]]; then
         USE_FOLDER="true"
         echo -n -e "${BRIGHT_CYAN}Folder name (e.g. 'BongoFlava'): ${RESET}"
         read -r FOLDER_NAME || FOLDER_NAME="Downloads"
@@ -928,8 +928,15 @@ echo -e "${BRIGHT_GREEN}╔═════════════════�
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at %-52s ${BRIGHT_GREEN}║${RESET}\n" "$(date '+%I:%M:%S %p')"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-printf "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} %-63s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$USE_FOLDER" == "true" ]] && echo "${FOLDER_NAME//\\033\[[0-9;]*m/}" || echo "Current directory" )"
-printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} %-68s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}FULL PLAYLIST${RESET}" || echo "SINGLE VIDEO ONLY" )"
+
+# Fixed line: Separate the color codes from the variable substitution
+FOLDER_DISPLAY="$( [[ "$USE_FOLDER" == "true" ]] && echo "${FOLDER_NAME//\\033\[[0-9;]*m/}" || echo "Current directory" )"
+printf "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} %-63s ${BRIGHT_GREEN}║${RESET}\n" "$FOLDER_DISPLAY"
+
+# Fixed lines: Separate color codes from conditional logic
+MODE_DISPLAY="$( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}FULL PLAYLIST${RESET}" || echo "SINGLE VIDEO ONLY" )"
+printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} %-68s ${BRIGHT_GREEN}║${RESET}\n" "$MODE_DISPLAY"
+
 printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Archive:${RESET} ${BRIGHT_GREEN}Updated automatically${RESET}                                          ${BRIGHT_GREEN}║${RESET}"
