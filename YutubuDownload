@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.1.0 — Added Metadata Display
+# Version: 1.1.0 — Fixed Metadata Display
 
 set -euo pipefail
 
@@ -119,7 +119,7 @@ show_progress_bar() {
     fi
 }
 
-# Function to get and display metadata BEFORE download
+# Function to get and display metadata BEFORE download - SIMPLIFIED AND RELIABLE
 get_and_display_metadata() {
     local url="$1"
     local is_playlist="$2"
@@ -128,101 +128,76 @@ get_and_display_metadata() {
     echo -e "${BRIGHT_CYAN}📋 METADATA INFORMATION${RESET}"
     echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
     
+    # Extract video ID from URL
+    local video_id=$(extract_video_id "$url")
+    
     if [[ "$is_playlist" == "true" ]]; then
-        echo -e "${CYAN}Fetching playlist metadata...${RESET}"
+        echo -e "${CYAN}Playlist URL detected${RESET}"
+        echo -e "${LIME}✅ Playlist mode selected${RESET}"
         
-        # Get playlist info
-        local playlist_info=$(timeout 30 yt-dlp --cookies-from-browser chrome --yes-playlist \
-            --dump-json \
-            --flat-playlist \
+        if [[ -n "$video_id" ]]; then
+            echo -e "${CYAN}Video ID in URL:${RESET} ${BRIGHT_YELLOW}${video_id}${RESET}"
+        fi
+        
+        # Try to get playlist info with timeout
+        echo -e "${CYAN}Fetching playlist info...${RESET}"
+        local playlist_title=$(timeout 15 yt-dlp --cookies-from-browser chrome --yes-playlist \
+            --get-title \
             --no-warnings \
-            --output-na-placeholder "-" \
-            "$url" 2>/dev/null | head -20 || echo "")
+            --quiet \
+            "$url" 2>/dev/null | head -1 || echo "")
         
-        if [[ -n "$playlist_info" ]]; then
-            # Count videos
-            local video_count=$(echo "$playlist_info" | grep -c '"title"' || echo "0")
-            echo -e "${LIME}✅ Playlist contains: ${BRIGHT_YELLOW}${video_count} videos${RESET}"
-            
-            # Get playlist title
-            local playlist_title=$(echo "$playlist_info" | grep -m1 '"playlist_title"' | cut -d':' -f2- | tr -d '", ' | head -1)
-            if [[ -n "$playlist_title" ]]; then
-                echo -e "${CYAN}Playlist:${RESET} ${BRIGHT_CYAN}${playlist_title}${RESET}"
-            fi
-            
-            echo ""
-            echo -e "${CYAN}Sample videos in playlist:${RESET}"
-            echo -e "${BRIGHT_MAGENTA}──────────────────────────────────────────────────────────────────────────────${RESET}"
-            
-            # Show first 3 videos as samples
-            local count=0
-            while IFS= read -r line; do
-                if [[ "$line" =~ \"title\":\ \"([^\"]+)\" ]]; then
-                    local title="${BASH_REMATCH[1]}"
-                    count=$((count + 1))
-                    echo -e "  ${BRIGHT_BLUE}${count}.${RESET} ${title}"
-                    
-                    if [[ $count -eq 3 ]]; then
-                        if [[ $video_count -gt 3 ]]; then
-                            echo -e "  ${BRIGHT_YELLOW}... and $((video_count - 3)) more videos${RESET}"
-                        fi
-                        break
-                    fi
-                fi
-            done < <(echo "$playlist_info")
+        if [[ -n "$playlist_title" ]]; then
+            echo -e "${CYAN}Playlist:${RESET} ${BRIGHT_CYAN}${playlist_title}${RESET}"
         else
-            echo -e "${ORANGE}⚠️  Could not fetch playlist metadata${RESET}"
+            echo -e "${YELLOW}Playlist title: ${BRIGHT_YELLOW}(Will be shown during download)${RESET}"
         fi
         
     else
-        # Single video metadata
-        echo -e "${CYAN}Fetching video metadata...${RESET}"
+        echo -e "${CYAN}Single video detected${RESET}"
         
-        local video_info=$(timeout 20 yt-dlp --cookies-from-browser chrome --no-playlist \
-            --dump-json \
-            --no-warnings \
-            "$url" 2>/dev/null || echo "")
-        
-        if [[ -n "$video_info" ]]; then
-            # Extract info
-            local title=$(echo "$video_info" | grep -o '"title":"[^"]*"' | cut -d'"' -f4 | head -1)
-            local channel=$(echo "$video_info" | grep -o '"uploader":"[^"]*"' | cut -d'"' -f4 | head -1)
-            local duration=$(echo "$video_info" | grep -o '"duration":[0-9]*' | cut -d':' -f2 | head -1)
-            local views=$(echo "$video_info" | grep -o '"view_count":[0-9]*' | cut -d':' -f2 | head -1)
-            local upload_date=$(echo "$video_info" | grep -o '"upload_date":"[^"]*"' | cut -d'"' -f4 | head -1)
+        if [[ -n "$video_id" ]]; then
+            echo -e "${LIME}✅ Video ID extracted${RESET}"
+            echo -e "${CYAN}Video ID:${RESET} ${BRIGHT_CYAN}${video_id}${RESET}"
             
-            if [[ -n "$title" ]]; then
-                echo -e "${LIME}✅ Metadata retrieved successfully${RESET}"
-                echo ""
-                echo -e "${CYAN}Title:${RESET}    ${BRIGHT_CYAN}${title}${RESET}"
+            # Try to get title with cookies first
+            echo -e "${CYAN}Fetching video info...${RESET}"
+            local video_title=$(timeout 20 yt-dlp --cookies-from-browser chrome --no-playlist \
+                --get-title \
+                --no-warnings \
+                --quiet \
+                "$url" 2>/dev/null | head -1 || echo "")
+            
+            if [[ -n "$video_title" ]]; then
+                echo -e "${CYAN}Title:${RESET} ${BRIGHT_GREEN}${video_title}${RESET}"
                 
-                if [[ -n "$channel" ]]; then
-                    echo -e "${CYAN}Channel:${RESET}  ${BRIGHT_YELLOW}${channel}${RESET}"
-                fi
+                # Try to get duration if title was successful
+                local duration=$(timeout 10 yt-dlp --cookies-from-browser chrome --no-playlist \
+                    --get-duration \
+                    --no-warnings \
+                    --quiet \
+                    "$url" 2>/dev/null | head -1 || echo "")
                 
                 if [[ -n "$duration" ]]; then
-                    local mins=$((duration / 60))
-                    local secs=$((duration % 60))
-                    echo -e "${CYAN}Duration:${RESET} ${BRIGHT_GREEN}${mins}m ${secs}s${RESET}"
-                fi
-                
-                if [[ -n "$views" ]]; then
-                    # Format views with commas
-                    local formatted_views=$(printf "%'d" "$views" 2>/dev/null || echo "$views")
-                    echo -e "${CYAN}Views:${RESET}    ${BRIGHT_MAGENTA}${formatted_views}${RESET}"
-                fi
-                
-                if [[ -n "$upload_date" ]]; then
-                    local year=${upload_date:0:4}
-                    local month=${upload_date:4:2}
-                    local day=${upload_date:6:2}
-                    echo -e "${CYAN}Uploaded:${RESET} ${BRIGHT_BLUE}${day}/${month}/${year}${RESET}"
+                    echo -e "${CYAN}Duration:${RESET} ${BRIGHT_BLUE}${duration}${RESET}"
                 fi
             else
-                echo -e "${ORANGE}⚠️  Could not fetch video metadata${RESET}"
+                # Fallback: Try without cookies
+                video_title=$(timeout 10 yt-dlp --no-playlist \
+                    --get-title \
+                    --no-warnings \
+                    --quiet \
+                    "$url" 2>/dev/null | head -1 || echo "")
+                
+                if [[ -n "$video_title" ]]; then
+                    echo -e "${CYAN}Title:${RESET} ${BRIGHT_GREEN}${video_title}${RESET} ${YELLOW}(public)${RESET}"
+                else
+                    echo -e "${YELLOW}Title: ${BRIGHT_YELLOW}(Will be shown during download)${RESET}"
+                fi
             fi
         else
-            echo -e "${ORANGE}⚠️  Could not fetch video metadata${RESET}"
+            echo -e "${ORANGE}⚠️  Could not extract video ID${RESET}"
+            echo -e "${YELLOW}Using direct URL for download...${RESET}"
         fi
     fi
     
