@@ -585,7 +585,8 @@ echo -e "${BRIGHT_GREEN}╔═════════════════�
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 printf "${BRIGHT_GREEN}║${RESET} ${BRIGHT_GREEN}✅ DOWNLOAD COMPLETE${RESET} at %-52s ${BRIGHT_GREEN}║${RESET}\n" "$(date '+%I:%M:%S %p')"
 echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
-printf "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} %-63s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} %-68s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}FULL PLAYLIST${RESET}" || echo "SINGLE VIDEO ONLY" )"
+printf "${BRIGHT_GREEN}║${RESET} ${CYAN}Files saved:${RESET} %-63s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$USE_FOLDER" == "true" ]] && echo "$FOLDER_NAME" || echo "Current directory" )"
+printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Mode:${RESET} %-68s ${BRIGHT_GREEN}║${RESET}\n" "$( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}FULL PLAYLIST${RESET}" || echo "SINGLE VIDEO ONLY" )"
 printf "${BRIGHT_GREEN}║${RESET} ${CYAN}• Audio:${RESET} ${BRIGHT_GREEN}GUARANTEED${RESET} (MP4 merge format)                                       ${BRIGHT_GREEN}║${RESET}"
 printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}• Quality:${RESET} ${BRIGHT_GREEN}Standard resolutions (360p-4K) always available${RESET}                   ${BRIGHT_GREEN}║${RESET}"
 echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
@@ -601,8 +602,6 @@ printf "\n${BRIGHT_GREEN}║${RESET} ${CYAN}Made with ❤️  for Tanzania by Jo
 echo -e "\n${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
 echo -e "${BRIGHT_GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${RESET}"
 echo ""
-
-
 
 # === SIGNATURE: QUOTE FROM JOHN BOSCO + ALIEN ART (GREEN) ===
 echo -e "\033[38;5;194m\"Out here doing some Alien things, Jesus is King...\" ~johnboscocjt (Isaiah 28:21)\033[0m"
