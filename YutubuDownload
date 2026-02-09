@@ -424,11 +424,9 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
 
-# === FIXED yt-dlp COMMAND WITH SINGLE-LINE PROGRESS BAR ===
+# === FIXED yt-dlp COMMAND WITH GREEN PROGRESS BAR ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
-    
-    # Run yt-dlp and capture output
     if yt-dlp \
         $PLAYLIST_FLAG \
         $MP3_FLAGS \
@@ -469,9 +467,6 @@ for ATTEMPT in 1 2 3; do
             elif [[ "$line" =~ ^\[info\].*Downloading.*format ]]; then
                 # Format info
                 echo -e "${LIME}$line${RESET}"
-            elif [[ "$line" =~ ^\[download\].*Destination: ]]; then
-                # File destination
-                echo -e "${BRIGHT_BLUE}$line${RESET}"
             elif [[ "$line" =~ ^\[download\] ]]; then
                 # Generic download messages
                 echo -e "${BRIGHT_BLUE}$line${RESET}"
@@ -491,57 +486,62 @@ for ATTEMPT in 1 2 3; do
             continue
         fi
         
-        # Parse progress line - Use the custom progress template format
+        # Parse progress line - FIXED THIS SECTION
         if [[ "$line" =~ ^download: ]]; then
-            # Format: download:1234567 45678901 12.3% 00:12 1.23MiB/s
-            read -r downloaded total percent eta speed <<< "$line"
+            # Extract the progress data
+            read -r _ downloaded total percent eta speed <<< "$line"
             
-            if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
+            # Clean the percent value
+            percent="${percent//%}"
+            
+            if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?$ ]]; then
                 percent_int="${BASH_REMATCH[1]}"
+                percent_display="${percent}%"
                 
                 if [ "$percent_int" -ge 99 ]; then
                     full_bar=$(printf '█%.0s' $(seq 1 $BAR_WIDTH))
                     percent_display="100.0%"
                     
-                    # Calculate MiB values
-                    if [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
-                        dl_mib=$(( total / 1048576 ))
-                        tot_mib=$(( total / 1048576 ))
-                    else
-                        dl_mib=0
-                        tot_mib="?"
-                    fi
-                    
-                    # Update progress bar
-                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
-                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
-                else
-                    filled=$(( (percent_int * BAR_WIDTH) / 100 ))
-                    bar=$(printf '█%.0s' $(seq 1 "$filled"))
-                    empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
-                    full_bar="$bar$empty"
-                    percent_display="$percent"
-                    
-                    # Calculate MiB values
-                    if [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
+                    if [ -n "$total" ] && [ "$total" != "-" ] && [ "$total" != "NA" ]; then
+                        # Convert bytes to MiB
                         dl_mib=$(( downloaded / 1048576 ))
                         tot_mib=$(( total / 1048576 ))
                     else
                         dl_mib=0
-                        tot_mib="?"
+                        tot_mib=0
                     fi
                     
-                    # Update progress bar
+                    # Use green status directly in printf
+                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
+                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+                else
+                    # Calculate filled bars
+                    filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+                    bar=$(printf '█%.0s' $(seq 1 "$filled"))
+                    empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+                    full_bar="$bar$empty"
+                    
+                    if [ -n "$total" ] && [ "$total" != "-" ] && [ "$total" != "NA" ]; then
+                        # Convert bytes to MiB
+                        dl_mib=$(( downloaded / 1048576 ))
+                        tot_mib=$(( total / 1048576 ))
+                    else
+                        dl_mib=0
+                        tot_mib=0
+                    fi
+                    
                     printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
                     printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
                         "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
                 fi
                 
-                # Update second line
+                # Second line with ETA, Speed, and Location
                 printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
                 printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
                     "$eta" "$speed" "$DISPLAY_LOCATION"
+                
+                sleep 0.1
             fi
         fi
         
@@ -561,9 +561,8 @@ for ATTEMPT in 1 2 3; do
         DOWNLOAD_SUCCESS=true
         break
     else
+        echo ""
         if [[ $ATTEMPT -lt 3 ]]; then
-            printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
             print_error "⚠️  Attempt $ATTEMPT failed. Refreshing cookies..."
             pkill -f "chrome" 2>/dev/null || true
             sleep 3
@@ -574,8 +573,6 @@ for ATTEMPT in 1 2 3; do
             wait $CHROME_PID 2>/dev/null || true
             echo -e "${SKY_BLUE}🔄 Retrying (attempt $((ATTEMPT + 1))...${RESET}"
             sleep 2
-        else
-            DOWNLOAD_SUCCESS=false
         fi
     fi
 done
@@ -594,14 +591,6 @@ if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     echo -e "     3. Reconnect and retry"
     exit 1
 fi
-
-# Show final completion message
-printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-printf "Downloading: ${GREEN}████████████████████${RESET} 100.0%% ${BRIGHT_BLUE}[${BRIGHT_GREEN}Done${RESET}${BRIGHT_BLUE}]${RESET}"
-printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
-printf "${BRIGHT_GREEN}✅ Download completed successfully!${RESET}"
-echo ""
-echo ""
 
 # === PERFECTLY ALIGNED COMPLETION BOX ===
 echo ""
