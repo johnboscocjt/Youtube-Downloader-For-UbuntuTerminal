@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.0.9 — Fixed pipeline variable scope
+# Version: 1.1.0 — Added Metadata Display
 
 set -euo pipefail
 
@@ -119,9 +119,120 @@ show_progress_bar() {
     fi
 }
 
+# Function to get and display metadata BEFORE download
+get_and_display_metadata() {
+    local url="$1"
+    local is_playlist="$2"
+    
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    echo -e "${BRIGHT_CYAN}📋 METADATA INFORMATION${RESET}"
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    
+    if [[ "$is_playlist" == "true" ]]; then
+        echo -e "${CYAN}Fetching playlist metadata...${RESET}"
+        
+        # Get playlist info
+        local playlist_info=$(timeout 30 yt-dlp --cookies-from-browser chrome --yes-playlist \
+            --dump-json \
+            --flat-playlist \
+            --no-warnings \
+            --output-na-placeholder "-" \
+            "$url" 2>/dev/null | head -20 || echo "")
+        
+        if [[ -n "$playlist_info" ]]; then
+            # Count videos
+            local video_count=$(echo "$playlist_info" | grep -c '"title"' || echo "0")
+            echo -e "${LIME}✅ Playlist contains: ${BRIGHT_YELLOW}${video_count} videos${RESET}"
+            
+            # Get playlist title
+            local playlist_title=$(echo "$playlist_info" | grep -m1 '"playlist_title"' | cut -d':' -f2- | tr -d '", ' | head -1)
+            if [[ -n "$playlist_title" ]]; then
+                echo -e "${CYAN}Playlist:${RESET} ${BRIGHT_CYAN}${playlist_title}${RESET}"
+            fi
+            
+            echo ""
+            echo -e "${CYAN}Sample videos in playlist:${RESET}"
+            echo -e "${BRIGHT_MAGENTA}──────────────────────────────────────────────────────────────────────────────${RESET}"
+            
+            # Show first 3 videos as samples
+            local count=0
+            while IFS= read -r line; do
+                if [[ "$line" =~ \"title\":\ \"([^\"]+)\" ]]; then
+                    local title="${BASH_REMATCH[1]}"
+                    count=$((count + 1))
+                    echo -e "  ${BRIGHT_BLUE}${count}.${RESET} ${title}"
+                    
+                    if [[ $count -eq 3 ]]; then
+                        if [[ $video_count -gt 3 ]]; then
+                            echo -e "  ${BRIGHT_YELLOW}... and $((video_count - 3)) more videos${RESET}"
+                        fi
+                        break
+                    fi
+                fi
+            done < <(echo "$playlist_info")
+        else
+            echo -e "${ORANGE}⚠️  Could not fetch playlist metadata${RESET}"
+        fi
+        
+    else
+        # Single video metadata
+        echo -e "${CYAN}Fetching video metadata...${RESET}"
+        
+        local video_info=$(timeout 20 yt-dlp --cookies-from-browser chrome --no-playlist \
+            --dump-json \
+            --no-warnings \
+            "$url" 2>/dev/null || echo "")
+        
+        if [[ -n "$video_info" ]]; then
+            # Extract info
+            local title=$(echo "$video_info" | grep -o '"title":"[^"]*"' | cut -d'"' -f4 | head -1)
+            local channel=$(echo "$video_info" | grep -o '"uploader":"[^"]*"' | cut -d'"' -f4 | head -1)
+            local duration=$(echo "$video_info" | grep -o '"duration":[0-9]*' | cut -d':' -f2 | head -1)
+            local views=$(echo "$video_info" | grep -o '"view_count":[0-9]*' | cut -d':' -f2 | head -1)
+            local upload_date=$(echo "$video_info" | grep -o '"upload_date":"[^"]*"' | cut -d'"' -f4 | head -1)
+            
+            if [[ -n "$title" ]]; then
+                echo -e "${LIME}✅ Metadata retrieved successfully${RESET}"
+                echo ""
+                echo -e "${CYAN}Title:${RESET}    ${BRIGHT_CYAN}${title}${RESET}"
+                
+                if [[ -n "$channel" ]]; then
+                    echo -e "${CYAN}Channel:${RESET}  ${BRIGHT_YELLOW}${channel}${RESET}"
+                fi
+                
+                if [[ -n "$duration" ]]; then
+                    local mins=$((duration / 60))
+                    local secs=$((duration % 60))
+                    echo -e "${CYAN}Duration:${RESET} ${BRIGHT_GREEN}${mins}m ${secs}s${RESET}"
+                fi
+                
+                if [[ -n "$views" ]]; then
+                    # Format views with commas
+                    local formatted_views=$(printf "%'d" "$views" 2>/dev/null || echo "$views")
+                    echo -e "${CYAN}Views:${RESET}    ${BRIGHT_MAGENTA}${formatted_views}${RESET}"
+                fi
+                
+                if [[ -n "$upload_date" ]]; then
+                    local year=${upload_date:0:4}
+                    local month=${upload_date:4:2}
+                    local day=${upload_date:6:2}
+                    echo -e "${CYAN}Uploaded:${RESET} ${BRIGHT_BLUE}${day}/${month}/${year}${RESET}"
+                fi
+            else
+                echo -e "${ORANGE}⚠️  Could not fetch video metadata${RESET}"
+            fi
+        else
+            echo -e "${ORANGE}⚠️  Could not fetch video metadata${RESET}"
+        fi
+    fi
+    
+    echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+    echo ""
+}
+
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.0.9 (2026-02-10) • Tanzania-Optimized • FIXED SCOPE"
+    echo "YutubuDownload v1.1.0 (2026-02-10) • Tanzania-Optimized • WITH METADATA"
     exit 0
 fi
 
@@ -142,7 +253,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubeDownload, v1.0.9${RESET}"
+echo -e "${BRIGHT_CYAN}YutubeDownload, v1.1.0${RESET}"
 
 # === SMART COOKIE REFRESH (Tanzania-optimized) ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
@@ -377,6 +488,9 @@ else
 fi
 echo ""
 
+# === SHOW METADATA BEFORE DOWNLOAD ===
+get_and_display_metadata "$URL" "$IS_PLAYLIST"
+
 # === DOWNLOAD SUMMARY ===
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${BRIGHT_CYAN}🚀 DOWNLOAD SUMMARY${RESET}"
@@ -388,6 +502,20 @@ echo -e "${CYAN}Destination:${RESET}  $( [[ "$USE_FOLDER" == "true" ]] && echo "
 echo -e "${CYAN}JS Runtime:${RESET}   $( [[ -n "$JS_RUNTIME" ]] && echo "${BRIGHT_GREEN}${JS_RUNTIME##*=}${RESET}" || echo "${ORANGE}None${RESET}" )"
 echo -e "${CYAN}Resume/Skip:${RESET}   ${BRIGHT_GREEN}File-based (auto-resume & skip)${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+echo ""
+
+# Ask for confirmation before download
+echo -e "${CYAN}Proceed with download?${RESET}"
+echo -n -e "  ${BRIGHT_CYAN}y${RESET} = Yes | ${BRIGHT_CYAN}n${RESET} = No [default=y]: ${RESET}"
+read -r CONFIRM || CONFIRM="y"
+CONFIRM="${CONFIRM:-y}"
+CONFIRM=$(echo "$CONFIRM" | tr '[:upper:]' '[:lower:]')
+
+if [[ "$CONFIRM" != "y" ]]; then
+    echo -e "${BRIGHT_YELLOW}Download cancelled by user.${RESET}"
+    exit 0
+fi
+
 echo ""
 
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
