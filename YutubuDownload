@@ -580,7 +580,7 @@ else
     FOLDER_CHOICE="${FOLDER_CHOICE:-n}"
     FOLDER_CHOICE=$(echo "$FOLDER_CHOICE" | xargs | tr '[:upper:]' '[:lower:]')
    
-    if [[ "${FOLDER_CHOICE}" == "y" ]]; then
+    if [[ "${FOLDER_CHOICE" == "y" ]]; then
         USE_FOLDER="true"
         echo -n -e "${BRIGHT_CYAN}Folder name (e.g. 'BongoFlava'): ${RESET}"
         read -r FOLDER_NAME || FOLDER_NAME="Downloads"
@@ -678,9 +678,16 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
 
-# === MODIFIED yt-dlp COMMAND TO HANDLE ARCHIVE PROMPTS ===
+# === MODIFIED yt-dlp COMMAND WITH RESTART LOGIC ===
 DOWNLOAD_SUCCESS=false
+ARCHIVE_CHANGED=false  # Track if archive was modified
+VIDEOS_TO_REMOVE=()   # Store videos to remove
+RESTART_COUNT=0
+
 for ATTEMPT in 1 2 3; do
+    # Reset restart count for each new attempt
+    RESTART_COUNT=0
+    
     if yt-dlp \
         $PLAYLIST_FLAG \
         $MP3_FLAGS \
@@ -728,14 +735,21 @@ for ATTEMPT in 1 2 3; do
                 
                 case "$choice" in
                     r)
-                        # Remove from archive and continue
-                        grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
-                        mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
-                        echo -e "   ${LIME}✅ Removed $VIDEO_ID from archive. Will download now.${RESET}"
+                        # Add to removal list
+                        VIDEOS_TO_REMOVE+=("$VIDEO_ID")
+                        ARCHIVE_CHANGED=true
+                        echo -e "   ${LIME}✅ Marked $VIDEO_ID for removal from archive${RESET}"
+                        echo -e "   ${SKY_BLUE}⚠️  Restarting download to include this video...${RESET}"
                         echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
                         echo ""
-                        # We need to restart the download for this specific video
-                        # For now, just continue and let yt-dlp handle it on next run
+                        
+                        # Update archive immediately
+                        grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                        mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+                        
+                        # Kill yt-dlp to force restart
+                        pkill -f "yt-dlp.*$URL" 2>/dev/null || true
+                        exit 130  # Exit with SIGINT code to trigger restart
                         ;;
                     a)
                         # Remove ALL archived videos from archive
@@ -745,12 +759,19 @@ for ATTEMPT in 1 2 3; do
                         if [[ "$confirm" == "y" ]]; then
                             # Clear the archive file
                             > "$ARCHIVE_FILE"
+                            ARCHIVE_CHANGED=true
                             echo -e "   ${LIME}✅ Cleared entire archive. All videos will be downloaded.${RESET}"
+                            echo -e "   ${SKY_BLUE}⚠️  Restarting download...${RESET}"
+                            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                            echo ""
+                            # Kill yt-dlp to force restart
+                            pkill -f "yt-dlp.*$URL" 2>/dev/null || true
+                            exit 130  # Exit with SIGINT code to trigger restart
                         else
                             echo -e "   ${LIME}✅ Keeping archive as is. Skipping this video.${RESET}"
+                            echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                            echo ""
                         fi
-                        echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-                        echo ""
                         ;;
                     *)
                         # Skip this video (default)
@@ -844,21 +865,44 @@ for ATTEMPT in 1 2 3; do
         fi
        
     done; then
+        # If we get here, download completed normally
         DOWNLOAD_SUCCESS=true
         break
     else
-        echo ""
-        if [[ $ATTEMPT -lt 3 ]]; then
-            print_error "⚠️  Attempt $ATTEMPT failed. Refreshing cookies..."
-            pkill -f "chrome" 2>/dev/null || true
-            sleep 3
-            google-chrome-stable --no-startup-window 2>/dev/null &
-            CHROME_PID=$!
-            sleep 3
-            kill $CHROME_PID 2>/dev/null || true
-            wait $CHROME_PID 2>/dev/null || true
-            echo -e "${SKY_BLUE}🔄 Retrying (attempt $((ATTEMPT + 1))...${RESET}"
-            sleep 2
+        EXIT_CODE=$?
+        
+        # Check if it was a restart request (exit code 130 = SIGINT)
+        if [[ $EXIT_CODE -eq 130 ]]; then
+            ((RESTART_COUNT++))
+            echo -e "\n${SKY_BLUE}🔄 Archive updated. Restarting download (restart #$RESTART_COUNT)...${RESET}"
+            echo ""
+            
+            # Reset flags for next iteration
+            ARCHIVE_CHANGED=false
+            VIDEOS_TO_REMOVE=()
+            
+            # Continue with next loop iteration (which will restart yt-dlp)
+            if [[ $RESTART_COUNT -lt 5 ]]; then  # Limit restarts to 5 times
+                continue
+            else
+                echo -e "${ORANGE}⚠️  Too many restarts. Continuing with current archive state.${RESET}"
+                DOWNLOAD_SUCCESS=true
+                break
+            fi
+        else
+            echo ""
+            if [[ $ATTEMPT -lt 3 ]]; then
+                print_error "⚠️  Attempt $ATTEMPT failed. Refreshing cookies..."
+                pkill -f "chrome" 2>/dev/null || true
+                sleep 3
+                google-chrome-stable --no-startup-window 2>/dev/null &
+                CHROME_PID=$!
+                sleep 3
+                kill $CHROME_PID 2>/dev/null || true
+                wait $CHROME_PID 2>/dev/null || true
+                echo -e "${SKY_BLUE}🔄 Retrying (attempt $((ATTEMPT + 1))...${RESET}"
+                sleep 2
+            fi
         fi
     fi
 done
