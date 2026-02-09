@@ -578,7 +578,6 @@ if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     exit 1
 fi
 
-
 # === PERFECTLY ALIGNED COMPLETION BOX ===
 echo ""
 echo -e "${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${RESET}"
