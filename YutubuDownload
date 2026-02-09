@@ -525,7 +525,7 @@ echo -e "${BRIGHT_GREEN}╚═════════════════�
 echo ""
 
 # === SIGNATURE ===
-echo -e "\033[38;5;194m\"Out here doing some Alien things, Jesus is King...\" ~johnboscocjt (Isaiah 28:21)\033[0m"
+echo -e "\033[38;5;194m\"Out here doing some Alien things, Jesus is King...\" ~johnboscocjt(Isaiah 28:21)\033[0m"
 echo -e "\033[38;5;82m"
 cat << 'EOF'
                                     ¸¸,..--------------------.....,¸
