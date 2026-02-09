@@ -442,9 +442,56 @@ for ATTEMPT in 1 2 3; do
         $ARCHIVE_FLAG \
         --newline \
         --no-warnings \
-        --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
+        --progress-template "PROGRESS:%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress._percent_str)s|%(progress._eta_str)s|%(progress._speed_str)s" \
         --output-na-placeholder "-" \
         "$URL" 2>&1 | while IFS= read -r line; do
+        
+        # Parse progress line
+        if [[ "$line" =~ ^PROGRESS: ]]; then
+            IFS='|' read -r downloaded total percent eta speed <<< "${line#PROGRESS:}"
+            
+            if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
+                percent_int="${BASH_REMATCH[1]}"
+                if [ "$percent_int" -ge 99 ]; then
+                    full_bar=$(printf '█%.0s' $(seq 1 $BAR_WIDTH))
+                    percent_display="100.0%"
+                    if [[ "$total" != "-" ]] && [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
+                        dl_mib=$(( downloaded / 1048576 ))
+                        tot_mib=$(( total / 1048576 ))
+                    else
+                        dl_mib=0
+                        tot_mib=0
+                    fi
+                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
+                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+                else
+                    filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+                    bar=$(printf '█%.0s' $(seq 1 "$filled"))
+                    empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+                    full_bar="$bar$empty"
+                    percent_display="$percent"
+                    if [[ "$total" != "-" ]] && [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
+                        dl_mib=$(( downloaded / 1048576 ))
+                        tot_mib=$(( total / 1048576 ))
+                    else
+                        dl_mib=0
+                        tot_mib=0
+                    fi
+                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
+                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+                fi
+                
+                # Second line with ETA, Speed, and Location
+                printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+                printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
+                    "$eta" "$speed" "$DISPLAY_LOCATION"
+                
+                sleep 0.1
+            fi
+            continue
+        fi
         
         # Handle metadata lines - Color them!
         if [[ "$line" =~ ^\[ ]]; then
@@ -484,51 +531,6 @@ for ATTEMPT in 1 2 3; do
                 echo -e "${CYAN}$line${RESET}"
             fi
             continue
-        fi
-        
-        # Parse progress line
-        read -r downloaded total percent eta speed <<< "$line"
-        
-        if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
-            percent_int="${BASH_REMATCH[1]}"
-            if [ "$percent_int" -ge 99 ]; then
-                full_bar=$(printf '█%.0s' $(seq 1 $BAR_WIDTH))
-                percent_display="100.0%"
-                if [ "$total" -gt 0 ]; then
-                    dl_mib=$(( total / 1048576 ))
-                    tot_mib=$(( total / 1048576 ))
-                else
-                    dl_mib=0
-                    tot_mib=0
-                fi
-                # Use green status directly in printf
-                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
-                    "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
-            else
-                filled=$(( (percent_int * BAR_WIDTH) / 100 ))
-                bar=$(printf '█%.0s' $(seq 1 "$filled"))
-                empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
-                full_bar="$bar$empty"
-                percent_display="$percent"
-                if [ "$total" -gt 0 ]; then
-                    dl_mib=$(( downloaded / 1048576 ))
-                    tot_mib=$(( total / 1048576 ))
-                else
-                    dl_mib=0
-                    tot_mib=0
-                fi
-                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
-                    "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
-            fi
-            
-            # Second line with ETA, Speed, and Location
-            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
-            printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
-                "$eta" "$speed" "$DISPLAY_LOCATION"
-            
-            sleep 0.3
         fi
         
         # Post-processing detection
