@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.0.3 — NO ARCHIVE • SINGLE PROGRESS BAR • MP3 + VIDEO SUPPORT
+# Version: 1.0.3 — NO ARCHIVE • SINGLE PROGRESS BAR • WORKING
 
 set -euo pipefail
 
@@ -83,7 +83,7 @@ if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
     exit 0
 fi
 
-# Force download option (kept for future use)
+# Force download option
 if [[ "${1:-}" == "--force-download" ]] || [[ "${1:-}" == "-f" ]]; then
     FORCE_DOWNLOAD="true"
     shift
@@ -368,9 +368,8 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download...${RESET}"
 
-# === CORE yt-dlp COMMAND — NO ARCHIVE + PROGRESS GUARANTEED ===
+# === CORE yt-dlp COMMAND — NO ARCHIVE ===
 DOWNLOAD_SUCCESS=false
-CURRENT_ITEM=""
 
 if yt-dlp \
     $PLAYLIST_FLAG \
@@ -386,20 +385,16 @@ if yt-dlp \
     --merge-output-format mp4 \
     --newline \
     --no-warnings \
-    --progress console \                          # ←← CRITICAL FOR PROGRESS
     --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
     --output-na-placeholder "-" \
     "$URL" 2>&1 | while IFS= read -r line; do
 
-    # Handle metadata lines (non-progress)
+    # Handle metadata lines
     if [[ "$line" =~ ^\[(youtube|download)\] ]]; then
         if [[ "$line" == *"[download] Downloading playlist:"* ]]; then
             echo -e "${BRIGHT_MAGENTA}$line${RESET}"
         elif [[ "$line" == *"[download] Downloading item "* ]]; then
-            if [[ "$line" != *"$CURRENT_ITEM"* ]]; then
-                CURRENT_ITEM="$line"
-                echo -e "${BRIGHT_CYAN}$line${RESET}"
-            fi
+            echo -e "${BRIGHT_CYAN}$line${RESET}"
         elif [[ "$line" == *"[ExtractAudio]"* ]] || [[ "$line" == *"[Merger]"* ]]; then
             printf "\r${CLEAR_LINE}${GOTO_COL1}"
             printf "\r${CLEAR_LINE}${GOTO_COL1}"
@@ -414,8 +409,8 @@ if yt-dlp \
         continue
     fi
 
-    # Handle real progress line
-    if [[ "$line" =~ ^download: ]]; then
+    # ✅ ONLY process real progress lines
+    if [[ "$line" == download:* ]]; then
         read -r _ downloaded total percent eta speed <<< "$line"
         if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
             percent_int="${BASH_REMATCH[1]}"
@@ -427,10 +422,7 @@ if yt-dlp \
             empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
             full_bar="$bar$empty"
 
-            # Clear two lines and redraw
             printf "\r${CLEAR_LINE}${GOTO_COL1}"
-            printf "\r${CLEAR_LINE}${GOTO_COL1}"
-
             if [ "$percent_int" -ge 99 ]; then
                 printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}\n" \
                     "$full_bar" "100.0%" "$dl_mib" "$tot_mib"
@@ -441,6 +433,7 @@ if yt-dlp \
 
             printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
                 "$eta" "$speed" "$DISPLAY_LOCATION"
+            sleep 0.2
         fi
         continue
     fi
