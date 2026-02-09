@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.1.0 — Fixed Metadata Display
+# Version: 1.1.1 — Fixed Progress Bar Persistence
 
 set -euo pipefail
 
@@ -110,12 +110,10 @@ show_progress_bar() {
         echo -ne "Item ${current}/${total}: ${BRIGHT_CYAN}${title}${RESET}"
         echo -ne "\n${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
         echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
-        echo -ne "\033[1A"  # Move cursor up 1 line
     else
         echo -ne "${BRIGHT_CYAN}${title}${RESET}"
         echo -ne "\n${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
         echo -ne " | ETA: ${YELLOW}${eta}${RESET} | Speed: ${CYAN}${speed}${RESET}"
-        echo -ne "\033[1A"  # Move cursor up 1 line
     fi
 }
 
@@ -207,7 +205,7 @@ get_and_display_metadata() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.1.0 (2026-02-10) • Tanzania-Optimized • WITH METADATA"
+    echo "YutubuDownload v1.1.1 (2026-02-10) • Tanzania-Optimized • WITH METADATA"
     exit 0
 fi
 
@@ -228,7 +226,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubeDownload, v1.1.0${RESET}"
+echo -e "${BRIGHT_CYAN}YutubeDownload, v1.1.1${RESET}"
 
 # === SMART COOKIE REFRESH (Tanzania-optimized) ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
@@ -575,22 +573,26 @@ yt-dlp \
         continue
     fi
     
-    # Parse download completion
+    # Parse download completion - DON'T CLEAR THE PROGRESS BAR
     if [[ "$line" =~ \[download\]\ +100%.*of\ +~?[[:space:]]*([0-9.]+)([KMGT])iB\ +in\ +([0-9:]+) ]] && ! $VIDEO_COMPLETE; then
-        echo -e "\r\033[K${BRIGHT_GREEN}✓ Downloaded:${RESET} ${BRIGHT_CYAN}${CURRENT_TITLE:-Video}${RESET}"
+        # Just add a newline after the progress bar to show completion message
+        echo ""  # Add newline after progress bar
+        echo -e "${BRIGHT_GREEN}✓ Downloaded:${RESET} ${BRIGHT_CYAN}${CURRENT_TITLE:-Video}${RESET}"
         VIDEO_COMPLETE=true
         continue
     fi
     
-    # Parse extraction/merging completion
+    # Parse extraction/merging completion - DON'T CLEAR THE PROGRESS BAR
     if ([[ "$line" =~ \[ExtractAudio\].*Destination: ]] || [[ "$line" =~ \[Merger\].*Merging.*into ]]) && ! $VIDEO_COMPLETE; then
+        # Just add a newline after the progress bar to show completion message
+        echo ""  # Add newline after progress bar
         # Try to extract title from the line
         if [[ "$line" =~ \/([^/]+)\.[^./]+$ ]]; then
             file_title="${BASH_REMATCH[1]}"
             file_title=$(echo "$file_title" | sed -E 's/^[0-9]{2,} - //')
-            echo -e "\r\033[K${BRIGHT_GREEN}✓ Processed:${RESET} ${BRIGHT_CYAN}${file_title}${RESET}"
+            echo -e "${BRIGHT_GREEN}✓ Processed:${RESET} ${BRIGHT_CYAN}${file_title}${RESET}"
         else
-            echo -e "\r\033[K${BRIGHT_GREEN}✓ Processing completed${RESET}"
+            echo -e "${BRIGHT_GREEN}✓ Processing completed${RESET}"
         fi
         VIDEO_COMPLETE=true
         continue
@@ -619,8 +621,7 @@ done
 # Capture exit status
 EXIT_CODE=${PIPESTATUS[0]}
 
-# Clear any leftover progress line
-echo -ne "\r\033[K"
+# DON'T clear the progress bar at the end
 
 if [ $EXIT_CODE -eq 0 ]; then
     DOWNLOAD_SUCCESS=true
