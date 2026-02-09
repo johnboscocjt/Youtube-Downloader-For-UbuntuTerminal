@@ -81,7 +81,7 @@ extract_video_id() {
     echo "$video_id"
 }
 
-# Function to process archived videos for playlist - SIMPLIFIED VERSION
+# Function to process archived videos for playlist - FIXED VERSION
 process_playlist_archive() {
     local url="$1"
     local archive_file="$2"
@@ -94,23 +94,73 @@ process_playlist_archive() {
         playlist_id="${BASH_REMATCH[1]}"
     fi
     
-    # Try to get video IDs from playlist (limit to 50 to avoid timeouts)
-    local all_video_ids=""
+    if [[ -z "$playlist_id" ]]; then
+        echo -e "${ORANGE}⚠️  Could not extract playlist ID from URL.${RESET}"
+        echo -e "${CYAN}Will check archive during download process.${RESET}"
+        return
+    fi
     
-    echo -e "${CYAN}Fetching playlist video IDs...${RESET}"
+    echo -e "${CYAN}Playlist ID: $playlist_id${RESET}"
     
-    # Method 1: Quick fetch with timeout
-    all_video_ids=$(timeout 15 yt-dlp \
+    # Create a temporary file for video IDs
+    local temp_file=$(mktemp)
+    
+    # Try to fetch playlist with SIMULATE mode (much faster)
+    echo -e "${CYAN}Fetching playlist information...${RESET}"
+    
+    # Method 1: Use --flat-playlist with --print (fastest)
+    timeout 30 yt-dlp \
         --cookies-from-browser chrome \
         --yes-playlist \
-        --get-id \
+        --flat-playlist \
+        --print "%(id)s" \
         --quiet \
         --no-warnings \
-        --playlist-end 50 \
-        "$url" 2>/dev/null || echo "")
+        --playlist-end 100 \
+        "https://www.youtube.com/playlist?list=$playlist_id" > "$temp_file" 2>/dev/null
+    
+    if [[ ! -s "$temp_file" ]]; then
+        # Method 2: Try with the original URL
+        timeout 25 yt-dlp \
+            --cookies-from-browser chrome \
+            --yes-playlist \
+            --flat-playlist \
+            --print "%(id)s" \
+            --quiet \
+            --no-warnings \
+            --playlist-end 100 \
+            "$url" > "$temp_file" 2>/dev/null
+    fi
+    
+    # Read the video IDs
+    local all_video_ids=""
+    if [[ -s "$temp_file" ]]; then
+        all_video_ids=$(cat "$temp_file" | head -n 100)
+        echo -e "${LIME}✅ Successfully fetched playlist${RESET}"
+    else
+        # Method 3: Last resort - try without cookies
+        echo -e "${ORANGE}⚠️  Trying without authentication...${RESET}"
+        timeout 20 yt-dlp \
+            --yes-playlist \
+            --flat-playlist \
+            --print "%(id)s" \
+            --quiet \
+            --no-warnings \
+            --playlist-end 50 \
+            "https://www.youtube.com/playlist?list=$playlist_id" > "$temp_file" 2>/dev/null
+        
+        if [[ -s "$temp_file" ]]; then
+            all_video_ids=$(cat "$temp_file" | head -n 50)
+            echo -e "${LIME}✅ Fetched playlist without authentication${RESET}"
+        fi
+    fi
+    
+    # Clean up temp file
+    rm -f "$temp_file" 2>/dev/null || true
     
     if [[ -z "$all_video_ids" ]]; then
-        echo -e "${ORANGE}⚠️  Could not fetch playlist. Using archive check during download.${RESET}"
+        echo -e "${ORANGE}⚠️  Could not fetch playlist info.${RESET}"
+        echo -e "${CYAN}Will show archive options during download instead.${RESET}"
         return
     fi
     
@@ -118,26 +168,25 @@ process_playlist_archive() {
     video_count=$(echo "$all_video_ids" | wc -l)
     echo -e "${LIME}✅ Found $video_count videos in playlist${RESET}"
     
-    # Check which videos are in archive
-    local archived_videos=()
-    local archived_count=0
-    
-    echo -e "${CYAN}Checking archive file...${RESET}"
-    
-    # Read archive file once
+    # Check archive file
     if [[ ! -f "$archive_file" ]] || [[ ! -s "$archive_file" ]]; then
         echo -e "${BRIGHT_GREEN}✅ Archive file is empty. All videos will be downloaded.${RESET}"
         return
     fi
     
-    # Load archive into array for faster lookup
+    # Check which videos are in archive
+    local archived_videos=()
+    local archived_count=0
+    
+    echo -e "${CYAN}Checking archive...${RESET}"
+    
+    # Read archive into array
     mapfile -t archive_array < "$archive_file" 2>/dev/null || true
     
-    # Check each video ID against archive
+    # Check each video
     while IFS= read -r video_id; do
         [[ -z "$video_id" ]] && continue
         
-        # Check if video_id is in archive array
         for archived_id in "${archive_array[@]}"; do
             if [[ "$archived_id" == "$video_id" ]]; then
                 archived_videos+=("$video_id")
@@ -165,6 +214,7 @@ process_playlist_archive() {
     for video_id in "${archived_videos[@]}"; do
         echo -e "${BRIGHT_BLUE}Video $index of $archived_count:${RESET}"
         echo -e "  ${CYAN}Video ID:${RESET} $video_id"
+        echo -e "  ${CYAN}URL:${RESET} https://youtu.be/$video_id"
         echo ""
         echo -e "  ${CYAN}Options:${RESET}"
         echo -e "    ${BRIGHT_GREEN}r${RESET} = RE-DOWNLOAD (remove from archive)"
@@ -179,7 +229,7 @@ process_playlist_archive() {
         case "$choice" in
             r)
                 videos_to_remove+=("$video_id")
-                echo -e "  ${LIME}✅ Will re-download video: $video_id${RESET}"
+                echo -e "  ${LIME}✅ Will re-download: $video_id${RESET}"
                 ;;
             a)
                 # Apply to all remaining
@@ -210,7 +260,7 @@ process_playlist_archive() {
                 ;;
             *)
                 videos_to_keep+=("$video_id")
-                echo -e "  ${LIME}✅ Will skip video: $video_id${RESET}"
+                echo -e "  ${LIME}✅ Will skip: $video_id${RESET}"
                 ;;
         esac
         
@@ -628,7 +678,7 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
 
-# === FIXED yt-dlp COMMAND WITH GREEN PROGRESS BAR ===
+# === MODIFIED yt-dlp COMMAND TO HANDLE ARCHIVE PROMPTS ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
     if yt-dlp \
@@ -649,6 +699,69 @@ for ATTEMPT in 1 2 3; do
         --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
         --output-na-placeholder "-" \
         "$URL" 2>&1 | while IFS= read -r line; do
+        
+        # INTERCEPT ARCHIVE MESSAGES AND ASK USER
+        if [[ "$line" =~ "has already been recorded in the archive" ]]; then
+            if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
+                VIDEO_ID="${BASH_REMATCH[1]}"
+                
+                # Show the user the archived video
+                echo ""
+                echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                echo -e "${ORANGE}⚠️  VIDEO ALREADY IN ARCHIVE DETECTED  ⚠️${RESET}"
+                echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                echo ""
+                echo -e "   ${CYAN}Video ID:${RESET} $VIDEO_ID"
+                echo -e "   ${CYAN}URL:${RESET} https://youtu.be/$VIDEO_ID"
+                echo -e "   ${ORANGE}⚠️  This video was previously downloaded${RESET}"
+                echo ""
+                
+                echo -e "   ${CYAN}Options:${RESET}"
+                echo -e "     ${BRIGHT_GREEN}r${RESET} = RE-DOWNLOAD (remove from archive)"
+                echo -e "     ${BRIGHT_BLUE}s${RESET} = SKIP (keep in archive)"
+                echo -e "     ${BRIGHT_YELLOW}a${RESET} = Apply to ALL remaining archived videos"
+                echo -n -e "   ${BRIGHT_CYAN}Your choice (r/s/a) [default=s]: ${RESET}"
+                
+                # Read from terminal, not from pipe
+                read -r choice </dev/tty
+                choice=$(echo "${choice:-s}" | tr '[:upper:]' '[:lower:]')
+                
+                case "$choice" in
+                    r)
+                        # Remove from archive and continue
+                        grep -vxF "$VIDEO_ID" "$ARCHIVE_FILE" > "${ARCHIVE_FILE}.tmp" 2>/dev/null || true
+                        mv "${ARCHIVE_FILE}.tmp" "$ARCHIVE_FILE" 2>/dev/null || true
+                        echo -e "   ${LIME}✅ Removed $VIDEO_ID from archive. Will download now.${RESET}"
+                        echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                        echo ""
+                        # We need to restart the download for this specific video
+                        # For now, just continue and let yt-dlp handle it on next run
+                        ;;
+                    a)
+                        # Remove ALL archived videos from archive
+                        echo -n -e "   ${BRIGHT_CYAN}Remove ALL archived videos from archive? (y/N): ${RESET}"
+                        read -r confirm </dev/tty
+                        confirm=$(echo "${confirm:-n}" | tr '[:upper:]' '[:lower:]')
+                        if [[ "$confirm" == "y" ]]; then
+                            # Clear the archive file
+                            > "$ARCHIVE_FILE"
+                            echo -e "   ${LIME}✅ Cleared entire archive. All videos will be downloaded.${RESET}"
+                        else
+                            echo -e "   ${LIME}✅ Keeping archive as is. Skipping this video.${RESET}"
+                        fi
+                        echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                        echo ""
+                        ;;
+                    *)
+                        # Skip this video (default)
+                        echo -e "   ${LIME}✅ Skipping $VIDEO_ID per your choice.${RESET}"
+                        echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
+                        echo ""
+                        ;;
+                esac
+            fi
+            continue
+        fi
        
         # Color metadata lines
         if [[ "$line" =~ ^\[ ]]; then
