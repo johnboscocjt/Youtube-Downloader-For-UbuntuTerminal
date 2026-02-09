@@ -285,7 +285,7 @@ if [[ "$IS_MP3" == "false" ]]; then
     
     DISPLAY_HEIGHTS=$(echo $DISPLAY_HEIGHTS | tr ' ' '\n' | sort -nur | uniq | tr '\n' ' ')
     
-    echo -e "${LIME}✅ Available standard qualities: $DISPLAY_HEights${RESET}"
+    echo -e "${LIME}✅ Available standard qualities: $DISPLAY_HEIGHTS${RESET}"
     echo -n -e "${BRIGHT_CYAN}Enter max height (e.g. 720, 1080) [default=720]: ${RESET}"
     read -r MAX_HEIGHT || MAX_HEIGHT="720"
     MAX_HEIGHT="${MAX_HEIGHT:-720}"
@@ -345,26 +345,26 @@ else
 fi
 echo ""
 
-# === IMPROVED ARCHIVE HANDLING WITH VIDEO TITLES ===
+# === ENHANCED ARCHIVE HANDLING WITH VIDEO TITLES ===
 VIDEO_ID=""
+VIDEO_TITLE=""
 if [[ "$URL" =~ (?:v=|youtu\.be/)([^&?/]{11}) ]]; then
     VIDEO_ID="${BASH_REMATCH[1]}"
 elif [[ "$URL" =~ youtube\.com/embed/([^/?&]{11}) ]]; then
     VIDEO_ID="${BASH_REMATCH[1]}"
 fi
 
-ARCHIVE_FILE="$HOME/yt-downloads-archive.txt"
-ARCHIVE_FLAG=""
-
-# Try to get video title BEFORE archive check (to avoid timeout issues)
-VIDEO_TITLE=""
+# Get video title for single videos
 if [[ -n "$VIDEO_ID" && "$IS_PLAYLIST" == "false" ]]; then
     echo -e "${SKY_BLUE}🔄 Getting video title...${RESET}"
-    VIDEO_TITLE=$(timeout 5 yt-dlp --get-title "$URL" 2>/dev/null || echo "Unknown Title")
+    VIDEO_TITLE=$(timeout 10 yt-dlp --get-title "$URL" 2>/dev/null || echo "Unknown Title")
     VIDEO_TITLE=$(echo "$VIDEO_TITLE" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 60)
-    echo -e "${LIME}✅ Title: ${VIDEO_TITLE}${RESET}"
+    echo -e "${LIME}✅ Title: $VIDEO_TITLE${RESET}"
     echo ""
 fi
+
+ARCHIVE_FILE="$HOME/yt-downloads-archive.txt"
+ARCHIVE_FLAG=""
 
 if [[ "$IS_PLAYLIST" == "true" ]]; then
     ARCHIVE_FLAG="--download-archive $ARCHIVE_FILE"
@@ -427,7 +427,7 @@ echo -e "${CYAN}JS Runtime:${RESET}   $( [[ -n "$JS_RUNTIME" ]] && echo "${BRIGH
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
 
-# === FIXED PROGRESS BAR CONFIGURATION ===
+# === PROGRESS BAR SETUP (FROM YOUR WORKING SCRIPT) ===
 BAR_WIDTH=20
 
 # Cursor movement
@@ -450,11 +450,19 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
 
-# === SIMPLE BUT EFFECTIVE DOWNLOAD LOGIC ===
+# === FIXED yt-dlp COMMAND WITH WORKING PROGRESS BAR ===
 DOWNLOAD_SUCCESS=false
-CURRENT_VIDEO_INFO=""
+ANY_VIDEO_DOWNLOADED=false
+CURRENT_VIDEO_TITLE="$VIDEO_TITLE"  # Start with the title we already fetched
 
 for ATTEMPT in 1 2 3; do
+    # Variables to track current video in playlist
+    if [[ "$IS_PLAYLIST" == "true" ]]; then
+        # For playlists, we'll extract titles from yt-dlp output
+        PLAYLIST_TEMP_FILE="/tmp/yt_current_video.txt"
+        rm -f "$PLAYLIST_TEMP_FILE" 2>/dev/null || true
+    fi
+    
     if yt-dlp \
         $PLAYLIST_FLAG \
         $MP3_FLAGS \
@@ -474,28 +482,24 @@ for ATTEMPT in 1 2 3; do
         --output-na-placeholder "-" \
         "$URL" 2>&1 | while IFS= read -r line; do
         
-        # Capture video title from metadata lines
-        if [[ "$line" =~ \[download\]\ Downloading.*item.*of ]] || [[ "$line" =~ \[download\]\ Downloading\ video ]]; then
-            # Extract title from download line
-            if [[ "$line" =~ \[download\]\ Downloading\ video\ [0-9]+\ of\ [0-9]+\ -\ (.*) ]]; then
-                CURRENT_VIDEO_INFO="${BASH_REMATCH[1]}"
-                CURRENT_VIDEO_INFO=$(echo "$CURRENT_VIDEO_INFO" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 40)
-            fi
-            echo -e "${BRIGHT_CYAN}$line${RESET}"
-            continue
-        fi
-        
-        # Handle metadata lines - Color them!
+        # Handle metadata lines - Extract video titles
         if [[ "$line" =~ ^\[ ]]; then
-            # Handle archive detection lines
+            # For playlists, extract video title from download lines
+            if [[ "$IS_PLAYLIST" == "true" ]] && [[ "$line" =~ \[download\]\ Downloading\ video\ [0-9]+\ of\ [0-9]+\ -\ (.+) ]]; then
+                CURRENT_VIDEO_TITLE="${BASH_REMATCH[1]}"
+                CURRENT_VIDEO_TITLE=$(echo "$CURRENT_VIDEO_TITLE" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 40)
+                echo "$CURRENT_VIDEO_TITLE" > "$PLAYLIST_TEMP_FILE" 2>/dev/null || true
+            fi
+            
+            # Handle archive messages in playlist mode
             if [[ "$line" =~ "has already been recorded in the archive" ]]; then
                 if [[ "$line" =~ \[download\]\ ([^:]+): ]]; then
                     FOUND_VIDEO_ID="${BASH_REMATCH[1]}"
                     
-                    # Get title for this video
+                    # Get title for archived video
                     FOUND_VIDEO_TITLE=""
-                    if [[ -n "$FOUND_VIDEO_ID" && "$IS_PLAYLIST" == "true" ]]; then
-                        FOUND_VIDEO_TITLE=$(timeout 3 yt-dlp --get-title "https://youtu.be/$FOUND_VIDEO_ID" 2>/dev/null || echo "Unknown Title")
+                    if [[ -n "$FOUND_VIDEO_ID" ]]; then
+                        FOUND_VIDEO_TITLE=$(timeout 5 yt-dlp --get-title "https://youtu.be/$FOUND_VIDEO_ID" 2>/dev/null || echo "Unknown Title")
                         FOUND_VIDEO_TITLE=$(echo "$FOUND_VIDEO_TITLE" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 50)
                     fi
                     
@@ -536,27 +540,39 @@ for ATTEMPT in 1 2 3; do
                             *)
                                 echo -e "${LIME}✅ SKIPPING '$FOUND_VIDEO_TITLE' (continuing with playlist)${RESET}"
                                 echo ""
-                                # yt-dlp will skip this video automatically when using --download-archive
+                                # yt-dlp will skip automatically when using --download-archive
                                 ;;
                         esac
+                    else
+                        # SINGLE VIDEO MODE (shouldn't reach here due to earlier check)
+                        echo -e "${LIME}✅ SKIPPING '$FOUND_VIDEO_TITLE'${RESET}"
+                        echo ""
                     fi
                 fi
                 continue
             fi
             
-            # Color other metadata lines
+            # Color different types of metadata lines
             if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]]; then
                 echo -e "${BRIGHT_MAGENTA}$line${RESET}"
+            elif [[ "$line" =~ ^\[download\].*Downloading.*item.*of ]]; then
+                echo -e "${BRIGHT_CYAN}$line${RESET}"
             elif [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
                 echo -e "${SKY_BLUE}$line${RESET}"
+            elif [[ "$line" =~ ^\[youtube\].*Downloading.*webpage ]]; then
+                echo -e "${CYAN}$line${RESET}"
             elif [[ "$line" =~ ^\[youtube\].*\[jsc: ]]; then
                 echo -e "${BRIGHT_GREEN}$line${RESET}"
+            elif [[ "$line" =~ ^\[info\].*Downloading.*format ]]; then
+                echo -e "${LIME}$line${RESET}"
+            elif [[ "$line" =~ ^\[download\] ]]; then
+                echo -e "${BRIGHT_BLUE}$line${RESET}"
+            elif [[ "$line" =~ ^\[youtube\] ]]; then
+                echo -e "${BLUE}$line${RESET}"
             elif [[ "$line" =~ ^\[ExtractAudio\] ]]; then
                 echo -e "${BRIGHT_GREEN}$line${RESET}"
             elif [[ "$line" =~ ^\[Merger\] ]]; then
                 echo -e "${BRIGHT_GREEN}$line${RESET}"
-            elif [[ "$line" =~ ^\[download\] ]]; then
-                echo -e "${BRIGHT_BLUE}$line${RESET}"
             else
                 echo -e "${CYAN}$line${RESET}"
             fi
@@ -565,6 +581,7 @@ for ATTEMPT in 1 2 3; do
         
         # Parse progress line
         if [[ "$line" =~ ^download: ]]; then
+            ANY_VIDEO_DOWNLOADED=true
             read -r downloaded total percent eta speed <<< "$line"
             
             if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
@@ -590,12 +607,14 @@ for ATTEMPT in 1 2 3; do
                 empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
                 full_bar="$bar$empty"
                 
-                # Display video info if available
-                if [ -n "$CURRENT_VIDEO_INFO" ]; then
-                    VIDEO_DISPLAY="Video: ${MAGENTA}$CURRENT_VIDEO_INFO${RESET}"
-                else
-                    VIDEO_DISPLAY="Video: ${MAGENTA}${VIDEO_TITLE:-Downloading...}${RESET}"
+                # Get current video title for display
+                if [[ "$IS_PLAYLIST" == "true" ]] && [[ -f "$PLAYLIST_TEMP_FILE" ]]; then
+                    CURRENT_VIDEO_TITLE=$(head -n1 "$PLAYLIST_TEMP_FILE" 2>/dev/null || echo "Playlist Video")
+                    CURRENT_VIDEO_TITLE=$(echo "$CURRENT_VIDEO_TITLE" | tr -d '\n' | sed 's/[[:space:]]+/ /g' | head -c 40)
                 fi
+                
+                # Display video title
+                VIDEO_DISPLAY="Video: ${MAGENTA}$CURRENT_VIDEO_TITLE${RESET}"
                 
                 if [ "$percent_int" -ge 99 ]; then
                     percent_display="100.0%"
@@ -647,12 +666,16 @@ for ATTEMPT in 1 2 3; do
             sleep 2
         fi
     fi
+    
+    # Clean up temp file
+    rm -f "$PLAYLIST_TEMP_FILE" 2>/dev/null || true
 done
 
 # Show cursor again
 echo -e "${SHOW_CURSOR}"
 
-if [[ "$DOWNLOAD_SUCCESS" == true ]]; then
+# Show completion message
+if [[ "$ANY_VIDEO_DOWNLOADED" == "true" ]] || [[ "$DOWNLOAD_SUCCESS" == true ]]; then
     echo ""
     echo -e "${BRIGHT_GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${RESET}"
     echo -e "${BRIGHT_GREEN}║${RESET}                                                                              ${BRIGHT_GREEN}║${RESET}"
