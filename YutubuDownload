@@ -424,7 +424,7 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo -e "${SKY_BLUE}Starting download... (progress will update in 2 fixed lines)${RESET}"
 
-# === FIXED yt-dlp COMMAND WITH REAL-TIME PROGRESS ===
+# === FIXED yt-dlp COMMAND WITH GREEN PROGRESS BAR ===
 DOWNLOAD_SUCCESS=false
 for ATTEMPT in 1 2 3; do
     if yt-dlp \
@@ -442,77 +442,9 @@ for ATTEMPT in 1 2 3; do
         $ARCHIVE_FLAG \
         --newline \
         --no-warnings \
-        --progress \
-        --progress-template "download:%(progress._percent_str)s|%(progress._eta_str)s|%(progress._speed_str)s|%(progress._total_bytes_str)s|%(progress._downloaded_bytes_str)s" \
+        --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
         --output-na-placeholder "-" \
         "$URL" 2>&1 | while IFS= read -r line; do
-        
-        # Parse progress template lines
-        if [[ "$line" =~ ^download:([^|]+)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*) ]]; then
-            percent="${BASH_REMATCH[1]}"
-            eta="${BASH_REMATCH[2]}"
-            speed="${BASH_REMATCH[3]}"
-            total_bytes="${BASH_REMATCH[4]}"
-            downloaded_bytes="${BASH_REMATCH[5]}"
-            
-            if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
-                percent_int="${BASH_REMATCH[1]}"
-                
-                # Calculate MiB values
-                dl_mib=0
-                tot_mib=0
-                
-                # Parse downloaded bytes (e.g., "3.00MiB")
-                if [[ "$downloaded_bytes" =~ ^([0-9.]+)([KMG])?i?B$ ]]; then
-                    num="${BASH_REMATCH[1]}"
-                    unit="${BASH_REMATCH[2]:-B}"
-                    case "$unit" in
-                        K) dl_mib=$(echo "$num / 1024" | bc -l 2>/dev/null || echo "0") ;;
-                        M) dl_mib="$num" ;;
-                        G) dl_mib=$(echo "$num * 1024" | bc -l 2>/dev/null || echo "0") ;;
-                        *) dl_mib=$(echo "$num / 1048576" | bc -l 2>/dev/null || echo "0") ;;
-                    esac
-                    dl_mib=$(printf "%.0f" "$dl_mib" 2>/dev/null || echo "0")
-                fi
-                
-                # Parse total bytes
-                if [[ "$total_bytes" =~ ^([0-9.]+)([KMG])?i?B$ ]]; then
-                    num="${BASH_REMATCH[1]}"
-                    unit="${BASH_REMATCH[2]:-B}"
-                    case "$unit" in
-                        K) tot_mib=$(echo "$num / 1024" | bc -l 2>/dev/null || echo "0") ;;
-                        M) tot_mib="$num" ;;
-                        G) tot_mib=$(echo "$num * 1024" | bc -l 2>/dev/null || echo "0") ;;
-                        *) tot_mib=$(echo "$num / 1048576" | bc -l 2>/dev/null || echo "0") ;;
-                    esac
-                    tot_mib=$(printf "%.0f" "$tot_mib" 2>/dev/null || echo "0")
-                fi
-                
-                # Create progress bar
-                filled=$(( (percent_int * BAR_WIDTH) / 100 ))
-                bar=$(printf '█%.0s' $(seq 1 "$filled"))
-                empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
-                full_bar="$bar$empty"
-                
-                # Update progress display
-                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
-                if [ "$percent_int" -ge 99 ]; then
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
-                        "$full_bar" "100.0%" "$dl_mib" "$tot_mib"
-                else
-                    printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
-                        "$full_bar" "$percent" "$dl_mib" "$tot_mib"
-                fi
-                
-                # Update ETA and Speed line
-                printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
-                printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
-                    "$eta" "$speed" "$DISPLAY_LOCATION"
-                
-                sleep 0.1
-            fi
-            continue
-        fi
         
         # Handle metadata lines - Color them!
         if [[ "$line" =~ ^\[ ]]; then
@@ -552,6 +484,52 @@ for ATTEMPT in 1 2 3; do
                 echo -e "${CYAN}$line${RESET}"
             fi
             continue
+        fi
+        
+        # Parse progress line
+        read -r downloaded total percent eta speed <<< "$line"
+        
+        if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
+            percent_int="${BASH_REMATCH[1]}"
+            
+            # FIXED: Calculate downloaded MiB correctly
+            if [[ "$downloaded" =~ ^[0-9]+$ ]] && [ "$downloaded" -gt 0 ]; then
+                dl_mib=$(( downloaded / 1048576 ))
+            else
+                dl_mib=0
+            fi
+            
+            # FIXED: Calculate total MiB correctly  
+            if [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
+                tot_mib=$(( total / 1048576 ))
+            else
+                tot_mib=0
+            fi
+            
+            # Create progress bar
+            filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+            bar=$(printf '█%.0s' $(seq 1 "$filled"))
+            empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+            full_bar="$bar$empty"
+            
+            if [ "$percent_int" -ge 99 ]; then
+                percent_display="100.0%"
+                # Use green status directly in printf
+                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}${BRIGHT_GREEN} Done!${RESET}" \
+                    "$full_bar" "$percent_display" "$dl_mib" "$tot_mib"
+            else
+                printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                printf "Downloading: ${GREEN}%s${RESET} %s ${BRIGHT_BLUE}[%dMiB/%dMiB]${RESET}" \
+                    "$full_bar" "$percent" "$dl_mib" "$tot_mib"
+            fi
+            
+            # Second line with ETA, Speed, and Location
+            printf "${DOWN_1}${CLEAR_LINE}${GOTO_COL1}"
+            printf "ETA: ${YELLOW}%s${RESET} | Speed: ${CYAN}%s${RESET} | Location: ${MAGENTA}%s${RESET}" \
+                "$eta" "$speed" "$DISPLAY_LOCATION"
+            
+            sleep 0.3
         fi
         
         # Post-processing detection
