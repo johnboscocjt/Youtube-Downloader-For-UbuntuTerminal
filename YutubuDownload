@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.1.3 — Fixed Progress Bar Display (Single Line)
+# Version: 1.1.4 — Fixed Color Codes and Banner Display
 
 set -euo pipefail
 
@@ -26,7 +26,7 @@ BRIGHT_WHITE="\033[97m"
 ORANGE="\033[38;5;214m"
 PINK="\033[38;5;206m"
 LIME="\033[38;5;46m"
-SKY_BLUE="\033{38;5;39m}"
+SKY_BLUE="\033[38;5;39m"  # FIXED: Changed { to [
 HOT_PINK="\033[38;5;196m"
 
 # === HELPER FUNCTION FOR PADDED COLORED OUTPUT ===
@@ -203,7 +203,7 @@ get_and_display_metadata() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.1.3 (2026-02-10) • Tanzania-Optimized • WITH METADATA"
+    echo "YutubuDownload v1.1.4 (2026-02-10) • Tanzania-Optimized • WITH METADATA"
     exit 0
 fi
 
@@ -220,11 +220,11 @@ fi
   echo -e "\033[38;5;51m▖▖  ▗   ▌   ▄        ▜      ▌"
   echo -e "\033[38;5;46m▌▌▌▌▜▘▌▌▛▌▌▌▌▌▛▌▌▌▌▛▌▐ ▛▌▀▌▛▌"
   echo -e "\033[38;5;39m▐ ▙▌▐▖▙▌▙▌▙▌▙▘▙▌▚▚▘▌▌▐▖▙▌█▌▙▌"
-  echo -e "\033{0m}"
+  echo -e "\033[0m"
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubeDownload, v1.1.3${RESET}"
+echo -e "${BRIGHT_CYAN}YutubuDownload, v1.1.4${RESET}"
 
 # === SMART COOKIE REFRESH (Tanzania-optimized) ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
