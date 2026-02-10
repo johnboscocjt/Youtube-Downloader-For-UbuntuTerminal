@@ -465,7 +465,7 @@ else
     read -r FOLDER_CHOICE || FOLDER_CHOICE="n"
     FOLDER_CHOICE="${FOLDER_CHOICE:-n}"
     FOLDER_CHOICE=$(echo "$FOLDER_CHOICE" | tr '[:upper:]' '[:lower:]')
-    if [[ "${FOLDER_CHOICE" == "y" ]]; then
+    if [[ "${FOLDER_CHOICE}" == "y" ]]; then
         USE_FOLDER="true"
         echo -n -e "${BRIGHT_CYAN}Folder name (e.g. 'BongoFlava'): ${RESET}"
         read -r FOLDER_NAME || FOLDER_NAME="Downloads"
