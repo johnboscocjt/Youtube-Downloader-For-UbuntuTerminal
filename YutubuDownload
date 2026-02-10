@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.1.4 — Fixed Color Codes and Banner Display
+# Version: 1.1.5 — Added File Size Tracking
 
 set -euo pipefail
 
@@ -26,7 +26,7 @@ BRIGHT_WHITE="\033[97m"
 ORANGE="\033[38;5;214m"
 PINK="\033[38;5;206m"
 LIME="\033[38;5;46m"
-SKY_BLUE="\033[38;5;39m"  # FIXED: Changed { to [
+SKY_BLUE="\033[38;5;39m"
 HOT_PINK="\033[38;5;196m"
 
 # === HELPER FUNCTION FOR PADDED COLORED OUTPUT ===
@@ -77,7 +77,7 @@ extract_video_id() {
     echo "$video_id"
 }
 
-# Function to display progress bar with title - FIXED: Now on ONE LINE
+# Function to display progress bar with title AND file size
 show_progress_bar() {
     local percent="$1"
     local current="$2"
@@ -86,6 +86,8 @@ show_progress_bar() {
     local speed="$5"
     local title="$6"
     local is_playlist="$7"
+    local current_size="$8"   # Added: current downloaded size
+    local total_size="$9"     # Added: total file size
     
     local BAR_WIDTH=20
     local percent_int=$(printf "%.0f" "$percent")
@@ -98,7 +100,7 @@ show_progress_bar() {
     local empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
     
     # Truncate title if too long
-    local max_title_length=30
+    local max_title_length=20
     if [ ${#title} -gt $max_title_length ]; then
         title="${title:0:$((max_title_length-3))}..."
     fi
@@ -108,9 +110,11 @@ show_progress_bar() {
     
     if [[ "$is_playlist" == "true" ]] && [ "$total" != "1" ]; then
         echo -ne "Item ${current}/${total}: ${BRIGHT_CYAN}${title}${RESET} ${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
+        echo -ne " | ${CYAN}${current_size}/${total_size}${RESET}"
         echo -ne " | ETA: ${YELLOW}${eta}${RESET} | ${CYAN}${speed}${RESET}"
     else
         echo -ne "${BRIGHT_CYAN}${title}${RESET} ${GREEN}${bar}${empty}${RESET} ${YELLOW}${percent}%${RESET}"
+        echo -ne " | ${CYAN}${current_size}/${total_size}${RESET}"
         echo -ne " | ETA: ${YELLOW}${eta}${RESET} | ${CYAN}${speed}${RESET}"
     fi
 }
@@ -203,7 +207,7 @@ get_and_display_metadata() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.1.4 (2026-02-10) • Tanzania-Optimized • WITH METADATA"
+    echo "YutubuDownload v1.1.5 (2026-02-10) • Tanzania-Optimized • WITH METADATA"
     exit 0
 fi
 
@@ -224,7 +228,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubuDownload, v1.1.4${RESET}"
+echo -e "${BRIGHT_CYAN}YutubuDownload, v1.1.5${RESET}"
 
 # === SMART COOKIE REFRESH (Tanzania-optimized) ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
@@ -563,21 +567,38 @@ yt-dlp \
         continue
     fi
     
-    # Parse individual video progress
+    # Parse individual video progress with file size tracking
     if [[ "$line" =~ \[download\]\ +([0-9.]+)%\ +of\ +~?[[:space:]]*([0-9.]+)([KMGT])iB\ +at\ +([0-9.]+)([KMGT]?)iB/s\ +ETA\ +([0-9:]+) ]]; then
         percent="${BASH_REMATCH[1]}"
+        total_size="${BASH_REMATCH[2]}${BASH_REMATCH[3]}iB"
         speed="${BASH_REMATCH[4]}${BASH_REMATCH[5]}iB/s"
         eta="${BASH_REMATCH[6]}"
+        
+        # Calculate current downloaded size
+        current_decimal=$(echo "$percent / 100 * ${BASH_REMATCH[2]}" | bc -l 2>/dev/null || echo "0")
+        current_size="${current_decimal}${BASH_REMATCH[3]}iB"
+        
+        # Round current size for display
+        if [[ "${BASH_REMATCH[3]}" == "K" ]]; then
+            current_rounded=$(printf "%.1f" "$current_decimal")
+            current_size="${current_rounded}${BASH_REMATCH[3]}iB"
+        elif [[ "${BASH_REMATCH[3]}" == "M" ]]; then
+            current_rounded=$(printf "%.1f" "$current_decimal")
+            current_size="${current_rounded}${BASH_REMATCH[3]}iB"
+        else
+            current_rounded=$(printf "%.0f" "$current_decimal")
+            current_size="${current_rounded}${BASH_REMATCH[3]}iB"
+        fi
         
         # Use current title or default
         display_title="${CURRENT_TITLE:-Downloading...}"
         
-        # Show individual progress bar with title
-        show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed" "$display_title" "$IS_PLAYLIST"
+        # Show individual progress bar with title AND file size
+        show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed" "$display_title" "$IS_PLAYLIST" "$current_size" "$total_size"
         continue
     fi
     
-    # Parse download completion - DON'T CLEAR THE PROGRESS BAR
+    # Parse download completion
     if [[ "$line" =~ \[download\]\ +100%.*of\ +~?[[:space:]]*([0-9.]+)([KMGT])iB\ +in\ +([0-9:]+) ]] && ! $VIDEO_COMPLETE; then
         # Just add a newline after the progress bar to show completion message
         echo ""  # Add newline after progress bar
@@ -586,7 +607,7 @@ yt-dlp \
         continue
     fi
     
-    # Parse extraction/merging completion - DON'T CLEAR THE PROGRESS BAR
+    # Parse extraction/merging completion
     if ([[ "$line" =~ \[ExtractAudio\].*Destination: ]] || [[ "$line" =~ \[Merger\].*Merging.*into ]]) && ! $VIDEO_COMPLETE; then
         # Just add a newline after the progress bar to show completion message
         echo ""  # Add newline after progress bar
