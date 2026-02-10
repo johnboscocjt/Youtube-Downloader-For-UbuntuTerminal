@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.1.8 — Single Progress Bar
+# Version: 1.1.8 — Fixed Progress Bar
 
 set -euo pipefail
 
@@ -75,37 +75,6 @@ extract_video_id() {
         video_id="${BASH_REMATCH[1]}"
     fi
     echo "$video_id"
-}
-
-# Function to display progress bar with title - FIXED: Now on ONE LINE
-show_progress_bar() {
-    local percent="$1"
-    local current="$2"
-    local total="$3"
-    local eta="$4"
-    local speed="$5"
-    local title="$6"
-    
-    local BAR_WIDTH=20
-    local percent_int=$(printf "%.0f" "$percent")
-    [ $percent_int -gt 100 ] && percent_int=100
-    [ $percent_int -lt 0 ] && percent_int=0
-    
-    local filled=$(( (percent_int * BAR_WIDTH) / 100 ))
-    [ $filled -gt $BAR_WIDTH ] && filled=$BAR_WIDTH
-    local bar=$(printf '█%.0s' $(seq 1 "$filled"))
-    local empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
-    
-    # Truncate title if too long
-    local max_title_length=25
-    if [ ${#title} -gt $max_title_length ]; then
-        title="${title:0:$((max_title_length-3))}..."
-    fi
-    
-    # Clear line and show everything on ONE LINE
-    printf "\r\033[K"
-    printf "${BRIGHT_CYAN}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%3.0f%%${RESET} | ${CYAN}%s/%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}" \
-        "$title" "$bar" "$empty" "$percent" "$current" "$total" "$eta" "$speed"
 }
 
 # Function to get and display metadata BEFORE download - SIMPLIFIED AND RELIABLE
@@ -487,171 +456,132 @@ echo -e "${BRIGHT_CYAN}📥 DOWNLOAD IN PROGRESS${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
 
-# === CORE DOWNLOAD WITH SINGLE PROGRESS BAR ===
-DOWNLOAD_SUCCESS=false
-CURRENT_ITEM=0
-TOTAL_ITEMS=0
-VIDEO_COMPLETE=false
-CURRENT_TITLE=""
+# === ENHANCED PROGRESS BAR CONFIGURATION ===
+BAR_WIDTH=20
 
-# Run yt-dlp with custom progress template
-{
-yt-dlp \
-    $PLAYLIST_FLAG \
-    $MP3_FLAGS \
-    -f "$FORMAT" \
-    -o "$OUTPUT_TEMPLATE" \
-    $JS_RUNTIME \
-    --cookies-from-browser chrome \
-    --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-    --ignore-errors \
-    --continue \
-    --no-overwrites \
-    --merge-output-format mp4 \
-    --newline \
-    --no-warnings \
-    --progress \
-    --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
-    --output-na-placeholder "-" \
-    "$URL" 2>&1
-} | while IFS= read -r line || [[ -n "$line" ]]; do
-    
-    # FILTER: Skip lines that are just a YouTube video ID (yt-dlp noise)
-    if [[ "$line" =~ ^[A-Za-z0-9_-]{11}$ ]]; then
-        continue
-    fi
-    
-    # Parse playlist item start
-    if [[ "$line" =~ "Downloading item" ]]; then
-        VIDEO_COMPLETE=false
-        CURRENT_TITLE=""  # Reset title for new video
-        if [[ "$line" =~ ([0-9]+)[[:space:]]+of[[:space:]]+([0-9]+) ]]; then
-            CURRENT_ITEM="${BASH_REMATCH[1]}"
-            TOTAL_ITEMS="${BASH_REMATCH[2]}"
-            echo ""
-            echo -e "${BRIGHT_CYAN}📥 Downloading item ${CURRENT_ITEM} of ${TOTAL_ITEMS}${RESET}"
-        fi
-        continue
-    fi
-    
-    # Parse video title when it starts downloading
-    if [[ "$line" =~ ^\[download\]\ +Destination:\ +(.*)$ ]]; then
-        dest="${BASH_REMATCH[1]}"
-        # Extract title from destination path
-        if [[ "$dest" =~ /([^/]+)\.[^./]+$ ]]; then
-            CURRENT_TITLE="${BASH_REMATCH[1]}"
-            # Remove playlist index prefix if present
-            CURRENT_TITLE=$(echo "$CURRENT_TITLE" | sed -E 's/^[0-9]{2,} - //')
-        fi
-        continue
-    fi
-    
-    # Parse video title from info line
-    if [[ "$line" =~ ^\[info\]\ +([^:]+):\ +Downloading ]]; then
-        CURRENT_TITLE="${BASH_REMATCH[1]}"
-        # Truncate if too long
-        if [ ${#CURRENT_TITLE} -gt 50 ]; then
-            CURRENT_TITLE="${CURRENT_TITLE:0:47}..."
-        fi
-        continue
-    fi
-    
-    # Parse progress from custom template
-    if [[ "$line" =~ ^download: ]]; then
-        # Remove "download:" prefix
-        line="${line#download:}"
-        read -r downloaded total percent eta speed <<< "$line"
+# Cursor movement
+CSI="\033["
+HIDE_CURSOR="${CSI}?25l"
+SHOW_CURSOR="${CSI}?25h"
+CLEAR_LINE="${CSI}2K"
+GOTO_COL1="${CSI}0G"
+UP_1="${CSI}1A"
+DOWN_1="${CSI}1B"
+
+# Hide cursor and set up cleanup trap
+echo -e "$HIDE_CURSOR"
+trap 'echo -e "${SHOW_CURSOR}"; echo -e "\r${CLEAR_LINE}${GOTO_COL1}"; echo -e "${UP_1}${CLEAR_LINE}${GOTO_COL1}"; exit' INT TERM EXIT
+
+echo -e "${SKY_BLUE}Starting download...${RESET}"
+echo ""  # Empty line for progress bar
+
+# === CORE DOWNLOAD WITH PROGRESS BAR ===
+DOWNLOAD_SUCCESS=false
+for ATTEMPT in 1 2 3; do
+    if yt-dlp \
+        $PLAYLIST_FLAG \
+        $MP3_FLAGS \
+        -f "$FORMAT" \
+        -o "$OUTPUT_TEMPLATE" \
+        $JS_RUNTIME \
+        --cookies-from-browser chrome \
+        --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+        --ignore-errors \
+        --continue \
+        --no-overwrites \
+        --merge-output-format mp4 \
+        --newline \
+        --no-warnings \
+        --progress-template "download:%(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress._percent_str)s %(progress._eta_str)s %(progress._speed_str)s" \
+        --output-na-placeholder "-" \
+        "$URL" 2>&1 | while IFS= read -r line; do
         
-        if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
-            # Calculate current downloaded size
-            if [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
-                # Convert bytes to MiB
-                tot_mib=$(( total / 1048576 ))
-                
-                # Calculate downloaded MiB from percentage
-                percent_num=$(echo "$percent" | sed 's/%//')
-                dl_mib=$(echo "scale=1; $percent_num / 100 * $tot_mib" | bc 2>/dev/null || echo "0")
-                dl_mib=$(printf "%.1f" "$dl_mib")
-            else
-                dl_mib=0
-                tot_mib=0
+        # Handle metadata lines
+        if [[ "$line" =~ ^\[ ]]; then
+            # Show metadata but don't interfere with progress bar
+            if [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
+                echo -e "${BLUE}$line${RESET}"
             fi
-            
-            # Use current title or default
-            display_title="${CURRENT_TITLE:-Downloading...}"
-            
-            # Show SINGLE progress bar that updates in place
-            show_progress_bar "$percent_num" "${dl_mib}MiB" "${tot_mib}MiB" "$eta" "$speed" "$display_title"
+            continue
         fi
-        continue
-    fi
-    
-    # Show playlist info
-    if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]]; then
-        echo -e "${BRIGHT_MAGENTA}${line}${RESET}"
-        continue
-    fi
-    
-    # Show URL extraction info
-    if [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
-        echo -e "${BLUE}${line}${RESET}"
-        continue
-    fi
-    
-    # Show format info
-    if [[ "$line" =~ ^\[info\].*Downloading.*format ]]; then
-        echo -e "${CYAN}${line}${RESET}"
-        continue
-    fi
-    
-    # Parse download completion
-    if [[ "$line" =~ \[download\]\ +100%.*of\ +~?[[:space:]]*([0-9.]+)([KMGT])iB\ +in\ +([0-9:]+) ]] && ! $VIDEO_COMPLETE; then
-        # Show final progress update
-        total_size="${BASH_REMATCH[1]}${BASH_REMATCH[2]}iB"
-        show_progress_bar "100" "$total_size" "$total_size" "00:00" "${BASH_REMATCH[1]}${BASH_REMATCH[2]}iB/s" "$CURRENT_TITLE"
         
-        # Add newline after progress bar to show completion message
-        echo ""
-        echo -e "${BRIGHT_GREEN}✓ Downloaded:${RESET} ${BRIGHT_CYAN}${CURRENT_TITLE:-Video}${RESET}"
-        VIDEO_COMPLETE=true
-        continue
-    fi
-    
-    # Parse extraction/merging completion
-    if ([[ "$line" =~ \[ExtractAudio\].*Destination: ]] || [[ "$line" =~ \[Merger\].*Merging.*into ]]) && ! $VIDEO_COMPLETE; then
-        # Add newline after progress bar to show completion message
-        echo ""
-        # Try to extract title from the line
-        if [[ "$line" =~ \/([^/]+)\.[^./]+$ ]]; then
-            file_title="${BASH_REMATCH[1]}"
-            file_title=$(echo "$file_title" | sed -E 's/^[0-9]{2,} - //')
-            echo -e "${BRIGHT_GREEN}✓ Processed:${RESET} ${BRIGHT_CYAN}${file_title}${RESET}"
-        else
-            echo -e "${BRIGHT_GREEN}✓ Processing completed${RESET}"
+        # Parse progress line from custom template
+        if [[ "$line" =~ ^download: ]]; then
+            # Remove "download:" prefix
+            line="${line#download:}"
+            read -r downloaded total percent eta speed <<< "$line"
+            
+            if [[ "$percent" =~ ^([0-9]+)(\.[0-9]+)?%$ ]]; then
+                percent_int="${BASH_REMATCH[1]}"
+                
+                # Calculate downloaded MiB
+                if [[ "$downloaded" =~ ^[0-9]+$ ]] && [ "$downloaded" -gt 0 ]; then
+                    dl_mib=$(( downloaded / 1048576 ))
+                else
+                    dl_mib=0
+                fi
+                
+                # Calculate total MiB  
+                if [[ "$total" =~ ^[0-9]+$ ]] && [ "$total" -gt 0 ]; then
+                    tot_mib=$(( total / 1048576 ))
+                else
+                    tot_mib=0
+                fi
+                
+                # Create progress bar
+                filled=$(( (percent_int * BAR_WIDTH) / 100 ))
+                bar=$(printf '█%.0s' $(seq 1 "$filled"))
+                empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
+                full_bar="$bar$empty"
+                
+                if [ "$percent_int" -ge 99 ]; then
+                    percent_display="100.0%"
+                    # Show final progress
+                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Downloading: ${GREEN}%s${RESET} %s | ${CYAN}%dMiB/%dMiB${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}" \
+                        "$full_bar" "$percent_display" "$dl_mib" "$tot_mib" "$eta" "$speed"
+                else
+                    # Show updating progress
+                    printf "${UP_1}${CLEAR_LINE}${GOTO_COL1}"
+                    printf "Downloading: ${GREEN}%s${RESET} %s | ${CYAN}%dMiB/%dMiB${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}" \
+                        "$full_bar" "$percent" "$dl_mib" "$tot_mib" "$eta" "$speed"
+                fi
+                
+                sleep 0.1
+            fi
         fi
-        VIDEO_COMPLETE=true
-        continue
+        
+    done; then
+        DOWNLOAD_SUCCESS=true
+        break
+    else
+        echo ""
+        if [[ $ATTEMPT -lt 3 ]]; then
+            print_error "⚠️  Attempt $ATTEMPT failed. Refreshing cookies..."
+            pkill -f "chrome" 2>/dev/null || true
+            sleep 3
+            google-chrome-stable --no-startup-window 2>/dev/null &
+            CHROME_PID=$!
+            sleep 3
+            kill $CHROME_PID 2>/dev/null || true
+            wait $CHROME_PID 2>/dev/null || true
+            echo -e "${SKY_BLUE}🔄 Retrying (attempt $((ATTEMPT + 1))...${RESET}"
+            sleep 2
+        fi
     fi
-    
 done
 
-# Capture exit status
-EXIT_CODE=${PIPESTATUS[0]}
+# Show cursor again
+echo -e "${SHOW_CURSOR}"
 
-if [ $EXIT_CODE -eq 0 ]; then
-    DOWNLOAD_SUCCESS=true
-    echo ""
-    echo -e "${BRIGHT_GREEN}✅ All downloads completed successfully!${RESET}"
-else
-    echo ""
-    echo -e "${ORANGE}⚠️  Download process ended with code $EXIT_CODE${RESET}"
-fi
-
+# Show completion message
 echo ""
+echo -e "${BRIGHT_GREEN}✓ Download complete!${RESET}"
 
 if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
+    echo ""
     echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
-    print_error "❌ DOWNLOAD FAILED"
+    print_error "❌ DOWNLOAD FAILED AFTER 3 ATTEMPTS"
     echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
     echo -e "${CYAN}   💡 TANZANIA FIX:${RESET}"
     echo -e "     1. Disconnect WiFi/Ethernet"
@@ -659,6 +589,10 @@ if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     echo -e "     3. Reconnect and retry"
     exit 1
 fi
+
+echo ""
+echo -e "${BRIGHT_GREEN}✅ All downloads completed successfully!${RESET}"
+echo ""
 
 # === COMPLETION BOX ===
 echo ""
