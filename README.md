@@ -1,4 +1,3 @@
-
 # 🎥 YutubuDownload  
 ### *Tanzania-Optimized YouTube Downloader for Ubuntu Terminal*  
 
@@ -17,10 +16,12 @@
    ░░░░░      ░░░░░░░░    ░░░░░    ░░░░░░░░ ░░░░░░░░    ░░░░░░░░ ░░░░░░░░░░    ░░░░░░     ░░░░ ░░░░    ░░░░ ░░░░░ ░░░░░  ░░░░░░   ░░░░░░░░  ░░░░░░░░ 
 ```
 
-**Author:** Johnbosco | **Last Updated:** February 08, 2026  
+**Author:** Johnbosco | **Last Updated:** February 10, 2026  
+**Version:** v1.1.6 — *Clean Progress Bar Edition*  
 🌍 *Tested across Dar es Salaam, Mwanza, Arusha & Zanzibar networks*  
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal)  
+[![Version](https://img.shields.io/badge/Version-1.1.6-brightgreen)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/releases/tag/v1.1.6)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 </div>
@@ -30,12 +31,29 @@
 
 ---
 
+## 🆕 What's New in v1.1.6?
+
+### ✨ **CLEAN PROGRESS BAR DISPLAY**
+- **Fixed**: No more messy, overlapping progress bar output
+- **Enhanced**: Single-line progress bar with clean updates
+- **Added**: File size display in real-time
+- **Format**: `Title VideoID ████████████████████░ 100.0% | 2.98MiB | ETA: 00:00 | 1.68MiB/s`
+- **Completion**: Clean download confirmation: `✓ Downloaded: Title [2.98MiB]`
+
+### 📊 **Enhanced Visual Feedback**
+- **Video ID Display**: Shows first 8 characters next to title
+- **Real-time File Size**: See download size as it progresses
+- **Color-coded Elements**: Consistent terminal coloring
+- **Smooth Updates**: Proper carriage returns for single-line updates
+
+---
+
 ## 🌌 Alien-Tech Terminal Experience
 
-YutubuDownload now features a **cyberpunk-inspired terminal interface** with:
-- 🔵 **Animated green loading pulses** for smooth feedback
-- 🔴 **Flashing red alerts** for critical errors
-- 🟢 **Hacker-green ASCII art** 
+YutubuDownload now features **professional terminal interface** with:
+- 🔵 **Clean single-line progress updates** for distraction-free downloading
+- 📊 **Real-time file size display** so you know what to expect
+- 🟡 **Video ID identification** for easy tracking
 - ✨ **Faith-powered closing flourish**
 
 Your terminal doesn’t just download — it **declares Kingdom authority over the digital realm**.
@@ -74,6 +92,9 @@ YutubuDownload
 
 - **🇹🇿 Tanzania-Optimized**  
   Resume support for unstable 4G networks (Vodacom/Airtel/Tigo)
+  
+- **📊 Clean Progress Display**  
+  Single-line progress bar with file size, ETA, and speed (v1.1.6)
   
 - **🛡️ Bot-Bypass Technology**  
   Uses Chrome cookies + user-agent spoofing to avoid "Sign in to confirm you're not a bot" errors
@@ -120,17 +141,19 @@ For detailed setup, troubleshooting, and advanced usage:
 ## 🔁 How to Update
 
 ```bash
-#One command
+# One command to update to latest version
 sudo bash -c "$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)"
-sudo chmod +x /usr/local/bin/YutubuDownload
-
 ```
 
-## OR:
+## OR Manual Update to v1.1.6:
 ```bash
 # Fetch latest version
 sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload
 sudo chmod +x /usr/local/bin/YutubuDownload
+
+# Check version
+YutubuDownload --version
+# Should show: YutubuDownload v1.1.6 (2026-02-10) • Tanzania-Optimized • CLEAN PROGRESS BAR
 ```
 
 ---
@@ -139,24 +162,50 @@ sudo chmod +x /usr/local/bin/YutubuDownload
 
 <div align="center">
   
-### **1. Terminal Interface & Main Menu**
+### **1. New Clean Progress Bar (v1.1.6)**
+![Clean Progress Bar](Screenshots/progress_v1.1.6.png)
+*Single-line progress with file size and ETA*
+
+### **2. Terminal Interface & Main Menu**
 ![Main Interface](Screenshots/1.png)
 
-### **2. URL Input & Processing**
+### **3. URL Input & Processing**
 ![URL Processing](Screenshots/2.png)
 
-### **3. Format Selection (Video/MP3)**
+### **4. Format Selection (Video/MP3)**
 ![Format Selection](Screenshots/3.png)
 
-### **4. Quality Selection & Download Progress**
+### **5. Quality Selection & Download Progress**
 ![Download Progress](Screenshots/4.png)
 
-### **5. Completion & File Organization**
+### **6. Completion & File Organization**
 ![Completion Screen](Screenshots/5.png)
 ![Completion Screen](Screenshots/6.png)
 ![Completion Screen](Screenshots/7.png)
 
 </div>
+
+---
+
+## 📋 Changelog
+
+### v1.1.6 (2026-02-10)
+- **Fixed**: Progress bar display - now shows single clean line
+- **Added**: File size display in progress bar
+- **Added**: Video ID (short) in progress display
+- **Improved**: Terminal output formatting
+- **Optimized**: Tanzania network compatibility
+
+### v1.1.5 (2026-02-10)
+- **Added**: File size to progress bar output
+- **Fixed**: EOF error in folder organization
+
+### v1.1.4 (2026-02-10)
+- **Fixed**: Color codes and banner display
+- **Added**: Metadata display before download
+
+### v1.1.0 (2026-02-09)
+- **Initial**: Tanzania-optimized YouTube downloader
 
 ---
 
@@ -172,6 +221,15 @@ sudo chmod +x /usr/local/bin/YutubuDownload
 
 ---
 
+## 🚀 Future Roadmap
+- [ ] Parallel download support
+- [ ] Download queue management  
+- [ ] Automatic quality selection based on network speed
+- [ ] GUI wrapper option
+- [ ] Mobile app companion
+
+---
+
 ## 🤝 Support & Contribution
 
 🐞 **Found a bug?** → [Open GitHub Issue](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/issues)  
@@ -183,11 +241,7 @@ sudo chmod +x /usr/local/bin/YutubuDownload
 ⭐ **If this saves you time/data in Tanzania, please star the repo!**  
 [![GitHub Stars](https://img.shields.io/github/stars/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal?style=social)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal)  
 
-*"YutubuDownload: Because slow internet shouldn't stop Tanzanian creators"*  
+**"YutubuDownload v1.1.6: Because clean progress bars matter when you're counting every megabyte in Tanzania"**  
 — Johnbosco, Dar es Salaam 🇹🇿  
 
 </div>
-
-
-
-
