@@ -34,7 +34,7 @@ cat << 'EOF'
                                                                                                                                        
 EOF
 echo "        Y U T U B U D O W N L O A D   I N S T A L L E R                  "
-echo "            Tanzania-Optimized • v1.0 • Feb 08, 2026                   "
+echo "            Tanzania-Optimized • v1.1.6 • Feb 10, 2026                   "
 echo ""
 
 # Helper function to check if package is installed
@@ -241,7 +241,7 @@ echo "║                                                                       
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
 
-echo "YUTUBUDOWNLOAD v1.0 • TANZANIA'S TERMINAL POWER  "
+echo "YUTUBUDOWNLOAD v1.1.6 • TANZANIA'S TERMINAL POWER  "
 echo "Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
 echo ""
 
