@@ -185,7 +185,7 @@ YutubuDownload --version
 
 <br />
 
-### **6. New Version : v1.1.6 **
+### ** 7. New Version : v1.1.6 **
 ![Completion Screen](Screenshots/a.png)
 ![Completion Screen](Screenshots/b.png)
 ![Completion Screen](Screenshots/c.png)
