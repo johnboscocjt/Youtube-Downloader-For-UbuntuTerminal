@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.1.5 — Added File Size Tracking
+# Version: 1.1.6 — Fixed Progress Bar Overwriting
 
 set -euo pipefail
 
@@ -105,7 +105,7 @@ show_progress_bar() {
         title="${title:0:$((max_title_length-3))}..."
     fi
     
-    # Clear line and show everything on ONE LINE
+    # Clear line and show everything on ONE LINE - use \r to return to start of line
     echo -ne "\r\033[K"
     
     if [[ "$is_playlist" == "true" ]] && [ "$total" != "1" ]; then
@@ -207,7 +207,7 @@ get_and_display_metadata() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.1.5 (2026-02-10) • Tanzania-Optimized • WITH METADATA"
+    echo "YutubuDownload v1.1.6 (2026-02-10) • Tanzania-Optimized • WITH METADATA"
     exit 0
 fi
 
@@ -228,7 +228,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubuDownload, v1.1.5${RESET}"
+echo -e "${BRIGHT_CYAN}YutubuDownload, v1.1.6${RESET}"
 
 # === SMART COOKIE REFRESH (Tanzania-optimized) ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
@@ -504,6 +504,7 @@ CURRENT_ITEM=0
 TOTAL_ITEMS=0
 VIDEO_COMPLETE=false
 CURRENT_TITLE=""
+LAST_PERCENT="-1"  # Track last percentage to throttle updates
 
 # Run yt-dlp and parse output
 {
@@ -576,9 +577,8 @@ yt-dlp \
         
         # Calculate current downloaded size
         current_decimal=$(echo "$percent / 100 * ${BASH_REMATCH[2]}" | bc -l 2>/dev/null || echo "0")
-        current_size="${current_decimal}${BASH_REMATCH[3]}iB"
         
-        # Round current size for display
+        # Format current size nicely
         if [[ "${BASH_REMATCH[3]}" == "K" ]]; then
             current_rounded=$(printf "%.1f" "$current_decimal")
             current_size="${current_rounded}${BASH_REMATCH[3]}iB"
@@ -593,15 +593,25 @@ yt-dlp \
         # Use current title or default
         display_title="${CURRENT_TITLE:-Downloading...}"
         
-        # Show individual progress bar with title AND file size
-        show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed" "$display_title" "$IS_PLAYLIST" "$current_size" "$total_size"
+        # Throttle updates to prevent rapid overwriting
+        # Only update if percentage has changed significantly (1% or more)
+        percent_int=$(printf "%.0f" "$percent")
+        if [[ $percent_int -ne $LAST_PERCENT ]] || [[ $percent_int -eq 100 ]]; then
+            # Show individual progress bar with title AND file size
+            show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed" "$display_title" "$IS_PLAYLIST" "$current_size" "$total_size"
+            LAST_PERCENT=$percent_int
+        fi
         continue
     fi
     
     # Parse download completion
     if [[ "$line" =~ \[download\]\ +100%.*of\ +~?[[:space:]]*([0-9.]+)([KMGT])iB\ +in\ +([0-9:]+) ]] && ! $VIDEO_COMPLETE; then
-        # Just add a newline after the progress bar to show completion message
-        echo ""  # Add newline after progress bar
+        # Show final progress update
+        total_size="${BASH_REMATCH[1]}${BASH_REMATCH[2]}iB"
+        show_progress_bar "100" "$CURRENT_ITEM" "$TOTAL_ITEMS" "00:00" "${BASH_REMATCH[1]}${BASH_REMATCH[2]}iB/s" "$CURRENT_TITLE" "$IS_PLAYLIST" "$total_size" "$total_size"
+        
+        # Add newline after progress bar to show completion message
+        echo ""
         echo -e "${BRIGHT_GREEN}✓ Downloaded:${RESET} ${BRIGHT_CYAN}${CURRENT_TITLE:-Video}${RESET}"
         VIDEO_COMPLETE=true
         continue
@@ -609,8 +619,8 @@ yt-dlp \
     
     # Parse extraction/merging completion
     if ([[ "$line" =~ \[ExtractAudio\].*Destination: ]] || [[ "$line" =~ \[Merger\].*Merging.*into ]]) && ! $VIDEO_COMPLETE; then
-        # Just add a newline after the progress bar to show completion message
-        echo ""  # Add newline after progress bar
+        # Add newline after progress bar to show completion message
+        echo ""
         # Try to extract title from the line
         if [[ "$line" =~ \/([^/]+)\.[^./]+$ ]]; then
             file_title="${BASH_REMATCH[1]}"
