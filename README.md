@@ -183,6 +183,22 @@ YutubuDownload --version
 ![Completion Screen](Screenshots/6.png)
 ![Completion Screen](Screenshots/7.png)
 
+<br />
+
+### **6. New Version : v1.1.6 **
+![Completion Screen](Screenshots/a.png)
+![Completion Screen](Screenshots/b.png)
+![Completion Screen](Screenshots/c.png)
+![Completion Screen](Screenshots/d.png)
+![Completion Screen](Screenshots/e.png)
+![Completion Screen](Screenshots/f.png)
+![Completion Screen](Screenshots/g.png)
+![Completion Screen](Screenshots/h.png)
+![Completion Screen](Screenshots/i.png)
+![Completion Screen](Screenshots/j.png)
+![Completion Screen](Screenshots/k.png)
+
+
 </div>
 
 ---
