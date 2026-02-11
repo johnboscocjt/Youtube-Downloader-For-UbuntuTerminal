@@ -45,6 +45,7 @@
 - **Real-time File Size**: See download size as it progresses
 - **Color-coded Elements**: Consistent terminal coloring
 - **Smooth Updates**: Proper carriage returns for single-line updates
+- **Exclusive Instance**: Operates as a single terminal session; does not support multiple simultaneous instances.
 
 ---
 
