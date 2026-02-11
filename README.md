@@ -163,7 +163,7 @@ YutubuDownload --version
 
 <div align="center">
   
-### **1. New Clean Progress Bar (v1.1.6)**
+### **1. Clean Progress Bar**
 ![Clean Progress Bar](Screenshots/6.png)
 *Single-line progress with file size and ETA*
 
