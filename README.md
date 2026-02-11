@@ -185,9 +185,9 @@ YutubuDownload --version
 
 <br />
 
-### **NOTE : Some times it will fail to download because of the 1.Time you are using, 2.WiFi/Network you are using, 3.New BOT block 4.You have to update and upgrade packages to latest releases for better downloading**
+### **NOTE : Some times it will fail to download because of the 1.Time you are using, 2.WiFi/Network you are using, 3.New BOT block 4.You have to update and upgrade packages to latest releases for better downloading, 4.Update wifi if broken**
 ![Completion Screen](Screenshots/z.png)
-### **SOLUTION : Update and upgrade your PC, Use Mobile Data by hotspotting your pc from your phone, Keep trying, close and re-open terminal, Kill chrome sessions or even close browsers, Find Ethernet and use it for downloading**
+### **SOLUTION : Update and upgrade your PC and your wifi package if broken, Use Mobile Data by hotspotting your pc from your phone, Keep trying, close and re-open terminal, Kill chrome sessions or even close browsers, Find Ethernet and use it for downloading**
 
 <br />
 
