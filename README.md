@@ -161,11 +161,6 @@ YutubuDownload --version
 ## 📸 Screenshots
 
 <div align="center">
-### **7. NOTE : Some times it will fail to download because of the 1.Time you are using, 2.WiFi/Network you are using, 3.New BOT block**
-![Completion Screen](Screenshots/z.png)
-### **7. SOLUTION : Keep trying, close and re-open terminal, Kill chrome sessions or even close browsers, Find Ethernet and use it for downloading**
-
-<br />
   
 ### **1. New Clean Progress Bar (v1.1.6)**
 ![Clean Progress Bar](Screenshots/progress_v1.1.6.png)
@@ -187,6 +182,12 @@ YutubuDownload --version
 ![Completion Screen](Screenshots/5.png)
 ![Completion Screen](Screenshots/6.png)
 ![Completion Screen](Screenshots/7.png)
+
+<br />
+
+### **NOTE : Some times it will fail to download because of the 1.Time you are using, 2.WiFi/Network you are using, 3.New BOT block**
+![Completion Screen](Screenshots/z.png)
+### **SOLUTION : Keep trying, close and re-open terminal, Kill chrome sessions or even close browsers, Find Ethernet and use it for downloading**
 
 <br />
 
