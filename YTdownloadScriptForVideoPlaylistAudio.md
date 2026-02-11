@@ -39,6 +39,8 @@
 - **Real-time File Size**: See download size as it progresses
 - **Color-coded Elements**: Consistent terminal coloring
 - **Smooth Updates**: Proper carriage returns for single-line updates
+- **Exclusive Instance**: Operates as a single terminal session; does not support multiple simultaneous instances.
+
 
 ---
 
@@ -206,7 +208,7 @@ Since late 2025, YouTube encrypts video signatures in JavaScript. yt-dlp **requi
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.1.6 — Fixed Single Progress Bar Display
+# Version: 1.1.8 — Fixed Progress Display Issues
 
 set -euo pipefail
 
@@ -232,6 +234,7 @@ PINK="\033[38;5;206m"
 LIME="\033[38;5;46m"
 SKY_BLUE="\033[38;5;39m"
 HOT_PINK="\033[38;5;196m"
+GRAY="\033[38;5;245m"
 
 # === HELPER FUNCTION FOR PADDED COLORED OUTPUT ===
 print_padded() {
@@ -326,7 +329,7 @@ show_progress_bar() {
     fi
 }
 
-# Function to get and display metadata BEFORE download
+# Function to get and display metadata BEFORE download - WITH ROBUST TIMEOUTS
 get_and_display_metadata() {
     local url="$1"
     local is_playlist="$2"
@@ -346,11 +349,26 @@ get_and_display_metadata() {
         fi
         
         echo -e "${CYAN}Fetching playlist info...${RESET}"
-        local playlist_title=$(timeout 15 yt-dlp --cookies-from-browser chrome --yes-playlist \
+        local playlist_title=""
+        # Try with cookies first, then without if it fails
+        playlist_title=$(timeout 10 yt-dlp --cookies-from-browser chrome --yes-playlist \
             --get-title \
             --no-warnings \
             --quiet \
+            --socket-timeout 5 \
+            --retries 1 \
             "$url" 2>/dev/null | head -1 || echo "")
+        
+        if [[ -z "$playlist_title" ]]; then
+            # Try without cookies
+            playlist_title=$(timeout 10 yt-dlp --yes-playlist \
+                --get-title \
+                --no-warnings \
+                --quiet \
+                --socket-timeout 5 \
+                --retries 1 \
+                "$url" 2>/dev/null | head -1 || echo "")
+        fi
         
         if [[ -n "$playlist_title" ]]; then
             echo -e "${CYAN}Playlist:${RESET} ${BRIGHT_CYAN}${playlist_title}${RESET}"
@@ -366,36 +384,45 @@ get_and_display_metadata() {
             echo -e "${CYAN}Video ID:${RESET} ${BRIGHT_CYAN}${video_id}${RESET}"
             
             echo -e "${CYAN}Fetching video info...${RESET}"
-            local video_title=$(timeout 20 yt-dlp --cookies-from-browser chrome --no-playlist \
+            local video_title=""
+            
+            # Try with cookies first (shorter timeout)
+            video_title=$(timeout 8 yt-dlp --cookies-from-browser chrome --no-playlist \
                 --get-title \
                 --no-warnings \
                 --quiet \
+                --socket-timeout 4 \
+                --retries 1 \
                 "$url" 2>/dev/null | head -1 || echo "")
+            
+            if [[ -z "$video_title" ]]; then
+                # Try without cookies
+                video_title=$(timeout 8 yt-dlp --no-playlist \
+                    --get-title \
+                    --no-warnings \
+                    --quiet \
+                    --socket-timeout 4 \
+                    --retries 1 \
+                    "$url" 2>/dev/null | head -1 || echo "")
+            fi
             
             if [[ -n "$video_title" ]]; then
                 echo -e "${CYAN}Title:${RESET} ${BRIGHT_GREEN}${video_title}${RESET}"
                 
-                local duration=$(timeout 10 yt-dlp --cookies-from-browser chrome --no-playlist \
+                # Try to get duration with shorter timeout
+                local duration=$(timeout 5 yt-dlp --cookies-from-browser chrome --no-playlist \
                     --get-duration \
                     --no-warnings \
                     --quiet \
+                    --socket-timeout 3 \
+                    --retries 1 \
                     "$url" 2>/dev/null | head -1 || echo "")
                 
                 if [[ -n "$duration" ]]; then
                     echo -e "${CYAN}Duration:${RESET} ${BRIGHT_BLUE}${duration}${RESET}"
                 fi
             else
-                video_title=$(timeout 10 yt-dlp --no-playlist \
-                    --get-title \
-                    --no-warnings \
-                    --quiet \
-                    "$url" 2>/dev/null | head -1 || echo "")
-                
-                if [[ -n "$video_title" ]]; then
-                    echo -e "${CYAN}Title:${RESET} ${BRIGHT_GREEN}${video_title}${RESET} ${YELLOW}(public)${RESET}"
-                else
-                    echo -e "${YELLOW}Title: ${BRIGHT_YELLOW}(Will be shown during download)${RESET}"
-                fi
+                echo -e "${YELLOW}Title: ${BRIGHT_YELLOW}(Will be shown during download)${RESET}"
             fi
         else
             echo -e "${ORANGE}⚠️  Could not extract video ID${RESET}"
@@ -409,7 +436,7 @@ get_and_display_metadata() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.1.6 (2026-02-10) • Tanzania-Optimized • CLEAN PROGRESS BAR"
+    echo "YutubuDownload v1.1.8 (2026-02-10) • Tanzania-Optimized • FIXED PROGRESS DISPLAY"
     exit 0
 fi
 
@@ -430,7 +457,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubuDownload, v1.1.6${RESET}"
+echo -e "${BRIGHT_CYAN}YutubuDownload, v1.1.8${RESET}"
 
 # === SMART COOKIE REFRESH ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
@@ -593,31 +620,46 @@ if [[ "$IS_MP3" == "false" ]]; then
     echo -e "${BRIGHT_CYAN}🎬 QUALITY SELECTION${RESET}"
     echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
     echo -e "${SKY_BLUE}🔍 Fetching available qualities...${RESET}"
-    ACTUAL_HEIGHTS=$(timeout 15 yt-dlp --cookies-from-browser chrome --no-playlist \
-        --print "%(height)s" "$URL" 2>/dev/null | \
+    
+    # Use shorter timeout for quality detection
+    ACTUAL_HEIGHTS=$(timeout 8 yt-dlp --cookies-from-browser chrome --no-playlist \
+        --print "%(height)s" \
+        --no-warnings \
+        --quiet \
+        --socket-timeout 5 \
+        --retries 1 \
+        "$URL" 2>/dev/null | \
         grep -E '^[0-9]+$' | sort -nur | uniq | head -n 10 || echo "")
+    
     STANDARD_HEIGHTS=(2160 1440 1080 720 480 360)
     DISPLAY_HEIGHTS=""
+    
     if [[ -n "$ACTUAL_HEIGHTS" ]]; then
         for h in $ACTUAL_HEIGHTS; do
             [[ " ${STANDARD_HEIGHTS[*]} " =~ " $h " ]] && DISPLAY_HEIGHTS="$DISPLAY_HEIGHTS $h"
         done
+        
         for std in "${STANDARD_HEIGHTS[@]}"; do
             [[ ! " $DISPLAY_HEIGHTS " =~ " $std " ]] && DISPLAY_HEIGHTS="$DISPLAY_HEIGHTS $std"
         done
     else
         DISPLAY_HEIGHTS="${STANDARD_HEIGHTS[*]}"
+        echo -e "${YELLOW}⚠️  Could not fetch qualities. Using default options.${RESET}"
     fi
+    
     DISPLAY_HEIGHTS=$(echo $DISPLAY_HEIGHTS | tr ' ' '\n' | sort -nur | uniq | tr '\n' ' ')
+    
     echo -e "${LIME}✅ Available standard qualities: $DISPLAY_HEIGHTS${RESET}"
     echo -n -e "${BRIGHT_CYAN}Enter max height (e.g. 720) [default=720]: ${RESET}"
     read -r MAX_HEIGHT || MAX_HEIGHT="720"
     MAX_HEIGHT="${MAX_HEIGHT:-720}"
     MAX_HEIGHT=$(echo "$MAX_HEIGHT" | xargs)
+    
     if [[ ! " ${STANDARD_HEIGHTS[*]} " =~ " $MAX_HEIGHT " ]]; then
         print_error "⚠️  Invalid height. Using default 720p."
         MAX_HEIGHT=720
     fi
+    
     FORMAT="bestvideo[height<=${MAX_HEIGHT}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${MAX_HEIGHT}][ext=mp4]/bestvideo[height<=${MAX_HEIGHT}]+bestaudio/best[height<=${MAX_HEIGHT}]"
 else
     MAX_HEIGHT="N/A"
@@ -706,8 +748,10 @@ CURRENT_ITEM=0
 TOTAL_ITEMS=0
 VIDEO_COMPLETE=false
 CURRENT_TITLE=""
+LAST_PROGRESS_TIME=0
+CURRENT_PROGRESS=""
 
-# Run yt-dlp and parse output
+# Run yt-dlp with network timeout options
 {
 yt-dlp \
     $PLAYLIST_FLAG \
@@ -725,6 +769,11 @@ yt-dlp \
     --no-warnings \
     --progress \
     --output-na-placeholder "-" \
+    --socket-timeout 10 \
+    --retries 3 \
+    --fragment-retries 3 \
+    --file-access-retries 3 \
+    --console-title \
     "$URL" 2>&1
 } | while IFS= read -r line || [[ -n "$line" ]]; do
     
@@ -765,19 +814,61 @@ yt-dlp \
         continue
     fi
     
-    # Parse progress with file size - SIMPLIFIED PATTERN
-    if [[ "$line" =~ \[download\]\ +([0-9.]+)%[[:space:]]+of[[:space:]]+~?[[:space:]]*([0-9.]+)([KMGT])iB[[:space:]]+at[[:space:]]+([0-9.]+)([KMGT]?)iB/s[[:space:]]+ETA[[:space:]]+([0-9:]+) ]]; then
+    # Parse progress with file size - IMPROVED PATTERNS
+    # Pattern 1: [download]  39.7% of   91.18MiB at  157.15KiB/s ETA 05:57
+    # Pattern 2: [download]  39.7% of ~91.18MiB at 157.15KiB/s ETA 05:57
+    # Pattern 3: [download]  39.7% of 91.18MiB at 157.15KiB/s ETA 05:57
+    # Pattern 4: [download]  39.7% of 91.18MiB at 157.15KiB/s ETA 05:57 | Solved Pract...
+    
+    if [[ "$line" =~ ^\[download\]\ +([0-9.]+)% ]]; then
         percent="${BASH_REMATCH[1]}"
-        file_size_num="${BASH_REMATCH[2]}"
-        file_size_unit="${BASH_REMATCH[3]}"
-        speed="${BASH_REMATCH[4]}${BASH_REMATCH[5]}iB/s"
-        eta="${BASH_REMATCH[6]}"
         
-        file_size="${file_size_num}${file_size_unit}iB"
+        # Extract file size
+        file_size=""
+        if [[ "$line" =~ of\ +~?[[:space:]]*([0-9.]+)([KMGT])iB ]]; then
+            file_size_num="${BASH_REMATCH[1]}"
+            file_size_unit="${BASH_REMATCH[2]}"
+            file_size="${file_size_num}${file_size_unit}iB"
+        fi
+        
+        # Extract speed
+        speed=""
+        if [[ "$line" =~ at\ +([0-9.]+)([KMGT]?)iB/s ]]; then
+            speed_num="${BASH_REMATCH[1]}"
+            speed_unit="${BASH_REMATCH[2]}"
+            speed="${speed_num}${speed_unit}iB/s"
+        fi
+        
+        # Extract ETA
+        eta=""
+        if [[ "$line" =~ ETA\ +([0-9:]+) ]]; then
+            eta="${BASH_REMATCH[1]}"
+        fi
+        
+        # If ETA not found in normal position, check for | ETA: format
+        if [[ -z "$eta" ]] && [[ "$line" =~ \|\ +ETA:\ +([0-9:]+) ]]; then
+            eta="${BASH_REMATCH[1]}"
+        fi
+        
+        # If still no ETA, try alternate format
+        if [[ -z "$eta" ]] && [[ "$line" =~ ETA:\ +([0-9:]+) ]]; then
+            eta="${BASH_REMATCH[1]}"
+        fi
+        
+        # Fallback values if parsing fails
+        file_size="${file_size:-0B}"
+        speed="${speed:-0B/s}"
+        eta="${eta:---:--}"
+        
         display_title="${CURRENT_TITLE:-$(extract_video_id "$URL")}"
         
-        # Show single progress bar that updates in place
-        show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed" "$display_title" "$IS_PLAYLIST" "$file_size"
+        # Show progress bar (throttle updates to prevent flicker)
+        current_time=$(date +%s)
+        if [[ $current_time -ge $((LAST_PROGRESS_TIME + 1)) ]] || [[ "$percent" == "100.0" ]]; then
+            show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed" "$display_title" "$IS_PLAYLIST" "$file_size"
+            LAST_PROGRESS_TIME=$current_time
+            CURRENT_PROGRESS="$percent%"
+        fi
         continue
     fi
     
@@ -787,7 +878,8 @@ yt-dlp \
         file_size_unit="${BASH_REMATCH[2]}"
         file_size="${file_size_num}${file_size_unit}iB"
         
-        # Finish the progress bar line
+        # Clear the progress line and show completion
+        printf "\r\033[K"
         echo ""
         echo -e "${BRIGHT_GREEN}✓ Downloaded:${RESET} ${BRIGHT_CYAN}${CURRENT_TITLE:-Video}${RESET} ${CYAN}[${file_size}]${RESET}"
         VIDEO_COMPLETE=true
@@ -796,41 +888,55 @@ yt-dlp \
     
     # Parse extraction/merging completion
     if ([[ "$line" =~ \[ExtractAudio\].*Destination: ]] || [[ "$line" =~ \[Merger\].*Merging.*into ]]) && ! $VIDEO_COMPLETE; then
-        local file_size_display=""
-        if [[ "$line" =~ of\ +([0-9.]+)([KMGT])iB ]]; then
-            file_size_num="${BASH_REMATCH[1]}"
-            file_size_unit="${BASH_REMATCH[2]}"
-            file_size_display=" [${file_size_num}${file_size_unit}iB]"
-        fi
-        
+        printf "\r\033[K"
         echo ""
         if [[ "$line" =~ \/([^/]+)\.[^./]+$ ]]; then
             file_title="${BASH_REMATCH[1]}"
             file_title=$(echo "$file_title" | sed -E 's/^[0-9]{2,} - //')
-            echo -e "${BRIGHT_GREEN}✓ Processed:${RESET} ${BRIGHT_CYAN}${file_title}${RESET}${CYAN}${file_size_display}${RESET}"
+            echo -e "${BRIGHT_GREEN}✓ Processed:${RESET} ${BRIGHT_CYAN}${file_title}${RESET}"
         else
-            echo -e "${BRIGHT_GREEN}✓ Processing completed${RESET}${CYAN}${file_size_display}${RESET}"
+            echo -e "${BRIGHT_GREEN}✓ Processing completed${RESET}"
         fi
         VIDEO_COMPLETE=true
         continue
     fi
     
-    # Show other info lines (but not in the progress bar area)
-    if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]]; then
-        echo -e "${BRIGHT_MAGENTA}${line}${RESET}"
+    # Handle other yt-dlp output - show only if not in middle of progress display
+    if [[ ! "$line" =~ ^\[download\]\ +[0-9] ]] && [[ "$line" =~ ^\[ ]]; then
+        # If we're in the middle of showing progress, clear the line first
+        if [[ -n "$CURRENT_PROGRESS" ]] && [[ ! "$line" =~ ETA: ]]; then
+            printf "\r\033[K"
+            CURRENT_PROGRESS=""
+        fi
+        
+        # Color code different message types
+        if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]]; then
+            echo -e "${BRIGHT_MAGENTA}${line}${RESET}"
+        elif [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
+            echo -e "${BLUE}${line}${RESET}"
+        elif [[ "$line" =~ ^\[info\].*Downloading.*format ]]; then
+            echo -e "${CYAN}${line}${RESET}"
+        elif [[ "$line" =~ ^\[info\] ]]; then
+            echo -e "${SKY_BLUE}${line}${RESET}"
+        elif [[ "$line" =~ ^\[warning\] ]]; then
+            echo -e "${YELLOW}${line}${RESET}"
+        elif [[ "$line" =~ ^\[debug\] ]]; then
+            # Skip debug messages
+            :
+        else
+            echo -e "${GRAY}${line}${RESET}"
+        fi
         continue
     fi
     
-    if [[ "$line" =~ ^\[youtube\].*Extracting.*URL ]]; then
-        echo -e "${BLUE}${line}${RESET}"
-        continue
+    # If we get here and the line contains progress-like info but didn't match above patterns
+    if [[ "$line" =~ ETA: ]] || [[ "$line" =~ [0-9]+\.[0-9]+% ]]; then
+        # Try to extract and display minimal progress info
+        percent=$(echo "$line" | grep -o '[0-9]\+\.[0-9]\+%' | head -1 | sed 's/%//' || echo "0")
+        if [[ -n "$percent" ]]; then
+            show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "--:--" "?" "${CURRENT_TITLE:-Video}" "$IS_PLAYLIST" "?"
+        fi
     fi
-    
-    if [[ "$line" =~ ^\[info\].*Downloading.*format ]]; then
-        echo -e "${CYAN}${line}${RESET}"
-        continue
-    fi
-    
 done
 
 # Capture exit status
@@ -855,6 +961,12 @@ if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     echo -e "     1. Disconnect WiFi/Ethernet"
     echo -e "     2. Wait 10 seconds"
     echo -e "     3. Reconnect and retry"
+    echo -e ""
+    echo -e "${CYAN}   🔧 TECHNICAL FIX:${RESET}"
+    echo -e "     • Check your internet connection"
+    echo -e "     • Try without cookies: Edit script and remove '--cookies-from-browser chrome'"
+    echo -e "     • Update yt-dlp: sudo yt-dlp -U"
+    echo -e "     • Use mobile hotspot if WiFi is unstable"
     exit 1
 fi
 
