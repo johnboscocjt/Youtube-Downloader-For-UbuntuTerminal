@@ -17,7 +17,7 @@
 ```
 
 **Author:** Johnbosco | **Last Updated:** February 10, 2026  
-**Version:** v1.1.6 — *Clean Progress Bar Edition*  
+**Version:** v1.1.8 — *Clean Progress Bar Edition*  
 🌍 *Tested across Dar es Salaam, Mwanza, Arusha & Zanzibar networks*  
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal)  
@@ -146,7 +146,7 @@ For detailed setup, troubleshooting, and advanced usage:
 sudo bash -c "$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)"
 ```
 
-## OR Manual Update to v1.1.6:
+## OR Manual Update to v1.1.8:
 ```bash
 # Fetch latest version
 sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload
