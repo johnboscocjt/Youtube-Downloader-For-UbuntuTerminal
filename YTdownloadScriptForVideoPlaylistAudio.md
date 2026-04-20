@@ -419,7 +419,7 @@ render_output_root() {
     fi
 }
 
-# Function to display a single progress bar - SIMPLIFIED
+# Function to display a single progress bar - line-based and readable in logs
 show_progress_bar() {
     local percent="$1"
     local current="$2"
@@ -443,25 +443,16 @@ show_progress_bar() {
     local bar=$(printf '█%.0s' $(seq 1 "$filled"))
     local empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
     
-    # Truncate title so the full status line stays on one terminal row.
+    # Truncate title so each progress update stays compact.
     local max_title_length=$((terminal_width - 52))
-    [ $max_title_length -gt 20 ] && max_title_length=20
+    [ $max_title_length -gt 24 ] && max_title_length=24
     [ $max_title_length -lt 8 ] && max_title_length=8
     if [ ${#title} -gt $max_title_length ]; then
         title="${title:0:$((max_title_length-3))}..."
     fi
-    
-    # Extract video ID for display (first 8 chars)
-    local video_id_short=""
-    if [[ -n "$title" && "$title" =~ ([A-Za-z0-9_-]{8,}) ]]; then
-        video_id_short="${BASH_REMATCH[1]:0:8}"
-    fi
-    
-    # Clear the entire line and print on a single row.
-    printf "\r\033[2K"
 
-    printf "${BRIGHT_CYAN}%s${RESET} ${YELLOW}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}" \
-        "$title" "$video_id_short" "$bar" "$empty" "$percent" "$file_size" "$eta" "$speed"
+    printf "${BRIGHT_CYAN}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}\n" \
+        "$title" "$bar" "$empty" "$percent" "$file_size" "$eta" "$speed"
 }
 
 # Function to get and display metadata BEFORE download - WITH ROBUST TIMEOUTS
@@ -1060,9 +1051,11 @@ yt-dlp \
         # Show progress bar (throttle updates to prevent flicker)
         current_time=$(date +%s)
         if [[ $current_time -ge $((LAST_PROGRESS_TIME + 1)) ]] || [[ "$percent" == "100.0" ]]; then
+            if [[ "$CURRENT_PROGRESS" != "$percent|$file_size|$eta|$speed" ]]; then
             show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "$eta" "$speed" "$display_title" "$IS_PLAYLIST" "$file_size"
-            LAST_PROGRESS_TIME=$current_time
-            CURRENT_PROGRESS="$percent%"
+                LAST_PROGRESS_TIME=$current_time
+                CURRENT_PROGRESS="$percent|$file_size|$eta|$speed"
+            fi
         fi
         continue
     fi
@@ -1073,8 +1066,7 @@ yt-dlp \
         file_size_unit="${BASH_REMATCH[2]}"
         file_size="${file_size_num}${file_size_unit}iB"
         
-        # Clear the progress line and show completion
-        printf "\r\033[K"
+        # Show completion on its own line
         echo ""
         echo -e "${BRIGHT_GREEN}✓ Downloaded:${RESET} ${BRIGHT_CYAN}${CURRENT_TITLE:-Video}${RESET} ${CYAN}[${file_size}]${RESET}"
         VIDEO_COMPLETE=true
@@ -1083,7 +1075,6 @@ yt-dlp \
     
     # Parse extraction/merging completion
     if ([[ "$line" =~ \[ExtractAudio\].*Destination: ]] || [[ "$line" =~ \[Merger\].*Merging.*into ]]) && ! $VIDEO_COMPLETE; then
-        printf "\r\033[K"
         echo ""
         if [[ "$line" =~ \/([^/]+)\.[^./]+$ ]]; then
             file_title="${BASH_REMATCH[1]}"
@@ -1098,12 +1089,6 @@ yt-dlp \
     
     # Handle other yt-dlp output - show only if not in middle of progress display
     if [[ ! "$line" =~ ^\[download\]\ +[0-9] ]] && [[ "$line" =~ ^\[ ]]; then
-        # If we're in the middle of showing progress, clear the line first
-        if [[ -n "$CURRENT_PROGRESS" ]] && [[ ! "$line" =~ ETA: ]]; then
-            printf "\r\033[K"
-            CURRENT_PROGRESS=""
-        fi
-        
         # Color code different message types
         if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]]; then
             echo -e "${BRIGHT_MAGENTA}${line}${RESET}"
