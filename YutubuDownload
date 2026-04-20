@@ -655,12 +655,12 @@ if [[ "$IS_PLAYLIST" == "true" ]]; then
         echo -n -e "${BRIGHT_CYAN}Folder name? (leave blank for auto): ${RESET}"
         read -r FOLDER_NAME || FOLDER_NAME=""
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
-        FOLDER_NAME="${FOLDER_NAME:-%(playlist_title)s [%(playlist_id)s]}"
-        OUTPUT_TEMPLATE="${FOLDER_NAME}/${SESSION_ID}/%(playlist_index)02d - %(title)s.%(ext)s"
-        OUTPUT_ROOT_DISPLAY="${FOLDER_NAME}/${SESSION_ID}"
+        PLAYLIST_FOLDER="${FOLDER_NAME:-%(playlist_title)s [%(playlist_id)s]}"
+        OUTPUT_TEMPLATE="${PLAYLIST_FOLDER}/%(playlist_index)02d - %(title)s.%(ext)s"
+        OUTPUT_ROOT_DISPLAY="${PLAYLIST_FOLDER}"
     else
-        OUTPUT_TEMPLATE="${SESSION_ID}/%(playlist_index)02d - %(title)s.%(ext)s"
-        OUTPUT_ROOT_DISPLAY="${SESSION_ID}"
+        OUTPUT_TEMPLATE="%(playlist_title)s [%(playlist_id)s]/%(playlist_index)02d - %(title)s.%(ext)s"
+        OUTPUT_ROOT_DISPLAY="%(playlist_title)s [%(playlist_id)s]"
     fi
 else
     echo -n -e "${CYAN}Save in custom folder? (${BRIGHT_CYAN}y${RESET}/${BRIGHT_CYAN}n${RESET}) [default=n]: ${RESET}"
@@ -673,16 +673,16 @@ else
         read -r FOLDER_NAME || FOLDER_NAME="Downloads"
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
         FOLDER_NAME="${FOLDER_NAME:-Downloads}"
-        OUTPUT_TEMPLATE="${FOLDER_NAME}/${SESSION_ID}/%(title)s.%(ext)s"
-        OUTPUT_ROOT_DISPLAY="${FOLDER_NAME}/${SESSION_ID}"
+        OUTPUT_TEMPLATE="${FOLDER_NAME}/%(title)s.%(ext)s"
+        OUTPUT_ROOT_DISPLAY="${FOLDER_NAME}"
     else
-        OUTPUT_TEMPLATE="${SESSION_ID}/%(title)s.%(ext)s"
-        OUTPUT_ROOT_DISPLAY="${SESSION_ID}"
+        OUTPUT_TEMPLATE="%(title)s.%(ext)s"
+        OUTPUT_ROOT_DISPLAY="$(pwd)"
     fi
 fi
 echo ""
 
-if [[ -n "${OUTPUT_ROOT_DISPLAY:-}" ]] && [[ "$OUTPUT_ROOT_DISPLAY" != *"%("* ]]; then
+if [[ -n "${OUTPUT_ROOT_DISPLAY:-}" ]] && [[ "$OUTPUT_ROOT_DISPLAY" != *"%("* ]] && [[ "$OUTPUT_ROOT_DISPLAY" != "$(pwd)" ]]; then
     mkdir -p "$OUTPUT_ROOT_DISPLAY" 2>/dev/null || true
 fi
 
