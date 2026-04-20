@@ -2,7 +2,7 @@
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
 # Author: Johnbosco | Updated: February 10, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.1.8 — Fixed Progress Display Issues
+# Version: 1.1.9 — Better Progress Bar + Quality Selection Fixes
 
 set -euo pipefail
 
@@ -230,7 +230,7 @@ get_and_display_metadata() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.1.8 (2026-02-10) • Tanzania-Optimized • FIXED PROGRESS DISPLAY"
+    echo "YutubuDownload v1.1.9 (2026-04-20) • Tanzania-Optimized • BETTER PROGRESS + QUALITY FIX"
     exit 0
 fi
 
@@ -251,7 +251,7 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubuDownload, v1.1.8${RESET}"
+echo -e "${BRIGHT_CYAN}YutubuDownload, v1.1.9${RESET}"
 
 # === SMART COOKIE REFRESH ===
 echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"

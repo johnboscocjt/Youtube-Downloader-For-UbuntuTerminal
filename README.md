@@ -17,11 +17,11 @@
 ```
 
 **Author:** Johnbosco | **Last Updated:** February 10, 2026  
-**Version:** v1.1.8 — *Clean Progress Bar Edition*  
+**Version:** v1.1.9 — *Better Progress + Quality Fix Edition*  
 🌍 *Tested across Dar es Salaam, Mwanza, Arusha & Zanzibar networks*  
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal)  
-[![Version](https://img.shields.io/badge/Version-1.1.6-brightgreen)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/releases/tag/v1.1.6)
+[![Version](https://img.shields.io/badge/Version-1.1.9-brightgreen)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/releases/tag/v1.1.9)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 </div>
@@ -31,7 +31,13 @@
 
 ---
 
-## 🆕 What's New in v1.1.6?
+## 🆕 What's New in v1.1.9?
+
+### 🚀 **BETTER PROGRESS BAR + QUALITY PICKING**
+- **Fixed**: Progress output now stays cleaner as a single terminal line
+- **Fixed**: User-selected quality now targets exact resolution when available
+- **Improved**: Falls back to nearest lower available resolution when exact one is missing
+- **Improved**: Better quality consistency for 1080p+ selections
 
 ### ✨ **CLEAN PROGRESS BAR DISPLAY**
 - **Fixed**: No more messy, overlapping progress bar output
@@ -146,7 +152,7 @@ For detailed setup, troubleshooting, and advanced usage:
 sudo bash -c "$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)"
 ```
 
-## OR Manual Update to v1.1.8:
+## OR Manual Update to v1.1.9:
 ```bash
 # Fetch latest version
 sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload
@@ -154,7 +160,7 @@ sudo chmod +x /usr/local/bin/YutubuDownload
 
 # Check version
 YutubuDownload --version
-# Should show: YutubuDownload v1.1.6 (2026-02-10) • Tanzania-Optimized • CLEAN PROGRESS BAR
+# Should show: YutubuDownload v1.1.9 (2026-04-20) • Tanzania-Optimized • BETTER PROGRESS + QUALITY FIX
 ```
 
 ---
@@ -192,7 +198,7 @@ YutubuDownload --version
 
 <br />
 
-### **7. New Version : v1.1.6**
+### **7. New Version : v1.1.9**
 ![Completion Screen](Screenshots/a.png)
 ![Completion Screen](Screenshots/b.png)
 ![Completion Screen](Screenshots/c.png)
@@ -211,6 +217,12 @@ YutubuDownload --version
 ---
 
 ## 📋 Changelog
+
+### v1.1.9 (2026-04-20)
+- **Fixed**: Better single-line progress behavior on unstable/slow networks
+- **Fixed**: Exact quality selection now respected when available
+- **Improved**: Automatic fallback to nearest lower available resolution
+- **Improved**: More reliable 1080p+ quality outcomes
 
 ### v1.1.6 (2026-02-10)
 - **Fixed**: Progress bar display - now shows single clean line
@@ -264,7 +276,7 @@ YutubuDownload --version
 ⭐ **If this saves you time/data in Tanzania, please star the repo!**  
 [![GitHub Stars](https://img.shields.io/github/stars/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal?style=social)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal)  
 
-**"YutubuDownload v1.1.6: Because clean progress bars matter when you're counting every megabyte in Tanzania"**  
+**"YutubuDownload v1.1.9: Better progress bars and reliable quality selection for Tanzania"**  
 — Johnbosco, Dar es Salaam 🇹🇿  
 
 </div>
