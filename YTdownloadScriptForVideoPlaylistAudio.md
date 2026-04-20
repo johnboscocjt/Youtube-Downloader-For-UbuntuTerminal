@@ -13,19 +13,27 @@
 
 ```
 
-**Author:** Johnbosco | **Last Updated:** February 10, 2026  
-**Version:** v1.1.6 — *Clean Progress Bar Edition*  
+**Author:** Johnbosco | **Last Updated:** April 20, 2026  
+**Version:** v2.0.0 — *Multi-Instance Shared-Cookie Edition*  
 🌍 *Tested across Dar es Salaam, Mwanza, Arusha & Zanzibar networks*  
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal)  
-[![Version](https://img.shields.io/badge/Version-1.1.6-brightgreen)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/releases/tag/v1.1.6)
+[![Version](https://img.shields.io/badge/Version-2.0.0-brightgreen)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/releases/tag/v2.0.0)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 </div>
 
 ---
 
-## 🆕 What's New in v1.1.6?
+## 🆕 What's New in v2.0.0?
+
+### 🧠 **MULTI-INSTANCE ARCHITECTURE (MAJOR RELEASE)**
+- **Added**: Safe concurrent downloads from multiple terminals
+- **Added**: Shared `cookies.txt` service with refresh locking
+- **Added**: Session isolation (`SESSION_ID`, temp dirs, logs, output roots)
+- **Added**: Optional fragment tuning with `YTDL_CONCURRENT_FRAGMENTS`
+- **Improved**: Exact quality targeting and fallback behavior
+- **Removed**: Forced Chrome process killing for cookie refresh
 
 ### ✨ **CLEAN PROGRESS BAR DISPLAY**
 - **Fixed**: No more messy, overlapping progress bar output
@@ -39,7 +47,7 @@
 - **Real-time File Size**: See download size as it progresses
 - **Color-coded Elements**: Consistent terminal coloring
 - **Smooth Updates**: Proper carriage returns for single-line updates
-- **Exclusive Instance**: Operates as a single terminal session; does not support multiple simultaneous instances.
+- **Multi-Instance Ready**: Supports multiple simultaneous terminal sessions safely.
 
 
 ---
@@ -66,7 +74,7 @@ This project uses **four essential files** that work together to give you a seam
 - ✅ Handles: bot bypass, resume support, smart folders, quality selection
 - ✅ Supports `--version` flag for verification
 - ✅ Uses Chrome cookies + Deno to defeat YouTube's 2026 anti-bot systems
-- ✅ **v1.1.6**: Clean single-line progress bar with file size display
+- ✅ **v2.0.0**: Multi-instance safe downloads with shared cookie store
 - 🎯 **Purpose**: Run this to download — it's the heart of the tool
 
 ### 4. `install.sh` — **The Silent Installer**
@@ -153,7 +161,7 @@ YouTube's anti-bot systems (especially in East Africa) cause frequent failures w
 - Data-saving mode: Fallback to 720p when high-res fails  
 - Offline-friendly: Works after brief connectivity loss  
 
-✅ **Clean Progress Display (v1.1.6)**  
+✅ **Clean Progress Display + Session Isolation (v2.0.0)**  
 - Single-line updates: `Title VideoID ████████████████████░ 100.0% | 2.98MiB | ETA: 00:00 | 1.68MiB/s`  
 - File size in real-time  
 - Video ID identification (first 8 chars)  
@@ -199,16 +207,16 @@ Since late 2025, YouTube encrypts video signatures in JavaScript. yt-dlp **requi
 
 ---
 
-## 🧪 Full Script Code: `YutubuDownload` (v1.1.6)
+## 🧪 Full Script Code: `YutubuDownload` (v2.0.0)
 
 > This is the exact content of the `YutubuDownload` file in your repo - **Updated with clean progress bar**.
 
 ```bash
 #!/usr/bin/env bash
 # YutubuDownload - Tanzania-Optimized YouTube Downloader for Ubuntu Terminal
-# Author: Johnbosco | Updated: February 10, 2026
+# Author: Johnbosco | Updated: April 20, 2026
 # GitHub: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal
-# Version: 1.1.8 — Fixed Progress Display Issues
+# Version: 2.0.0 — Multi-Instance Shared-Cookie Architecture
 
 set -euo pipefail
 
@@ -235,6 +243,104 @@ LIME="\033[38;5;46m"
 SKY_BLUE="\033[38;5;39m"
 HOT_PINK="\033[38;5;196m"
 GRAY="\033[38;5;245m"
+
+# === SESSION / COOKIE STATE ===
+SESSION_ID="${YTDL_SESSION_ID:-$(date '+%Y%m%d-%H%M%S')-$$}"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/YutubuDownload"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/YutubuDownload"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/YutubuDownload"
+COOKIE_FILE="$CONFIG_DIR/cookies.txt"
+COOKIE_LOCK_FILE="$STATE_DIR/cookies.lock"
+SESSION_ROOT="$CACHE_DIR/runs/$SESSION_ID"
+SESSION_TEMP_DIR="$SESSION_ROOT/tmp"
+SESSION_LOG_FILE="$SESSION_ROOT/download.log"
+
+mkdir -p "$CONFIG_DIR" "$STATE_DIR" "$SESSION_TEMP_DIR"
+: > "$SESSION_LOG_FILE" 2>/dev/null || true
+
+cookie_store_is_fresh() {
+    [[ -s "$COOKIE_FILE" ]] || return 1
+    local max_age=1800
+    local now
+    local modified
+    modified=$(stat -c %Y "$COOKIE_FILE" 2>/dev/null || echo 0)
+    now=$(date +%s)
+    [[ $((now - modified)) -lt $max_age ]]
+}
+
+export_shared_cookies() {
+    python3 - "$COOKIE_FILE" <<'PY'
+import http.cookiejar
+import os
+import sys
+
+try:
+    import browser_cookie3
+except Exception as exc:
+    print(f"browser_cookie3 import failed: {exc}", file=sys.stderr)
+    sys.exit(2)
+
+cookie_path = sys.argv[1]
+loaders = []
+for name in ("chrome", "chromium", "brave", "edge"):
+    loader = getattr(browser_cookie3, name, None)
+    if loader is not None:
+        loaders.append((name, loader))
+
+jar = None
+last_error = None
+for _, loader in loaders:
+    try:
+        jar = loader()
+        if jar:
+            break
+    except Exception as exc:
+        last_error = exc
+
+if jar is None:
+    print(f"Unable to read browser cookies: {last_error}", file=sys.stderr)
+    sys.exit(3)
+
+with open(cookie_path, "w", encoding="utf-8") as handle:
+    handle.write("# Netscape HTTP Cookie File\n")
+    handle.write("# Generated by YutubuDownload\n")
+    for cookie in jar:
+        domain = cookie.domain or ""
+        include_subdomains = "TRUE" if domain.startswith(".") else "FALSE"
+        path = cookie.path or "/"
+        secure = "TRUE" if cookie.secure else "FALSE"
+        expires = str(int(cookie.expires)) if cookie.expires else "0"
+        name = cookie.name or ""
+        value = cookie.value or ""
+        handle.write("\t".join([domain, include_subdomains, path, secure, expires, name, value]) + "\n")
+PY
+}
+
+refresh_cookie_store() {
+    local force_refresh="${1:-false}"
+    exec 9>"$COOKIE_LOCK_FILE"
+    flock -x 9
+
+    if [[ "$force_refresh" != "true" ]] && cookie_store_is_fresh; then
+        exec 9>&-
+        return 0
+    fi
+
+    echo -e "${SKY_BLUE}🧾 Refreshing shared cookies for this session${RESET}"
+    if export_shared_cookies; then
+        chmod 600 "$COOKIE_FILE" 2>/dev/null || true
+        echo -e "${LIME}✅ Shared cookies ready: $COOKIE_FILE${RESET}"
+        exec 9>&-
+    else
+        print_error "❌ Failed to export browser cookies"
+        echo "   Install browser-cookie3 in the active Python environment and keep Chrome logged in."
+        exit 1
+    fi
+}
+
+ensure_cookie_store() {
+    refresh_cookie_store "false"
+}
 
 # === HELPER FUNCTION FOR PADDED COLORED OUTPUT ===
 print_padded() {
@@ -284,6 +390,27 @@ extract_video_id() {
     echo "$video_id"
 }
 
+render_output_root() {
+    local base_dir="$1"
+    local is_playlist="$2"
+    local use_folder="$3"
+    local folder_name="$4"
+
+    if [[ "$is_playlist" == "true" ]]; then
+        if [[ "$use_folder" == "true" ]]; then
+            echo "${folder_name}/${SESSION_ID}"
+        else
+            echo "${SESSION_ID}"
+        fi
+    else
+        if [[ "$use_folder" == "true" ]]; then
+            echo "${folder_name}/${SESSION_ID}"
+        else
+            echo "${SESSION_ID}"
+        fi
+    fi
+}
+
 # Function to display a single progress bar - SIMPLIFIED
 show_progress_bar() {
     local percent="$1"
@@ -295,7 +422,10 @@ show_progress_bar() {
     local is_playlist="$7"
     local file_size="$8"
     
-    local BAR_WIDTH=20
+    local terminal_width=$(tput cols 2>/dev/null || echo 80)
+    [[ "$terminal_width" =~ ^[0-9]+$ ]] || terminal_width=80
+
+    local BAR_WIDTH=14
     local percent_int=$(printf "%.0f" "$percent")
     [ $percent_int -gt 100 ] && percent_int=100
     [ $percent_int -lt 0 ] && percent_int=0
@@ -305,8 +435,10 @@ show_progress_bar() {
     local bar=$(printf '█%.0s' $(seq 1 "$filled"))
     local empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
     
-    # Truncate title if too long
-    local max_title_length=20
+    # Truncate title so the full status line stays on one terminal row.
+    local max_title_length=$((terminal_width - 52))
+    [ $max_title_length -gt 20 ] && max_title_length=20
+    [ $max_title_length -lt 8 ] && max_title_length=8
     if [ ${#title} -gt $max_title_length ]; then
         title="${title:0:$((max_title_length-3))}..."
     fi
@@ -317,16 +449,11 @@ show_progress_bar() {
         video_id_short="${BASH_REMATCH[1]:0:8}"
     fi
     
-    # Clear the entire line and print on single line
-    printf "\r\033[K"
-    
-    if [[ "$is_playlist" == "true" ]] && [ "$total" != "1" ] && [ "$total" != "0" ]; then
-        printf "${BRIGHT_CYAN}%s${RESET} ${YELLOW}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}" \
-            "$title" "$video_id_short" "$bar" "$empty" "$percent" "$file_size" "$eta" "$speed"
-    else
-        printf "${BRIGHT_CYAN}%s${RESET} ${YELLOW}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}" \
-            "$title" "$video_id_short" "$bar" "$empty" "$percent" "$file_size" "$eta" "$speed"
-    fi
+    # Clear the entire line and print on a single row.
+    printf "\r\033[2K"
+
+    printf "${BRIGHT_CYAN}%s${RESET} ${YELLOW}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}" \
+        "$title" "$video_id_short" "$bar" "$empty" "$percent" "$file_size" "$eta" "$speed"
 }
 
 # Function to get and display metadata BEFORE download - WITH ROBUST TIMEOUTS
@@ -351,7 +478,7 @@ get_and_display_metadata() {
         echo -e "${CYAN}Fetching playlist info...${RESET}"
         local playlist_title=""
         # Try with cookies first, then without if it fails
-        playlist_title=$(timeout 10 yt-dlp --cookies-from-browser chrome --yes-playlist \
+        playlist_title=$(timeout 10 yt-dlp --cookies "$COOKIE_FILE" --yes-playlist \
             --get-title \
             --no-warnings \
             --quiet \
@@ -387,7 +514,7 @@ get_and_display_metadata() {
             local video_title=""
             
             # Try with cookies first (shorter timeout)
-            video_title=$(timeout 8 yt-dlp --cookies-from-browser chrome --no-playlist \
+            video_title=$(timeout 8 yt-dlp --cookies "$COOKIE_FILE" --no-playlist \
                 --get-title \
                 --no-warnings \
                 --quiet \
@@ -410,7 +537,7 @@ get_and_display_metadata() {
                 echo -e "${CYAN}Title:${RESET} ${BRIGHT_GREEN}${video_title}${RESET}"
                 
                 # Try to get duration with shorter timeout
-                local duration=$(timeout 5 yt-dlp --cookies-from-browser chrome --no-playlist \
+                local duration=$(timeout 5 yt-dlp --cookies "$COOKIE_FILE" --no-playlist \
                     --get-duration \
                     --no-warnings \
                     --quiet \
@@ -436,7 +563,7 @@ get_and_display_metadata() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v1.1.8 (2026-02-10) • Tanzania-Optimized • FIXED PROGRESS DISPLAY"
+    echo "YutubuDownload v2.0.0 (2026-04-20) • Tanzania-Optimized • MULTI-INSTANCE + SHARED COOKIES"
     exit 0
 fi
 
@@ -457,22 +584,12 @@ fi
 } >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubuDownload, v1.1.8${RESET}"
+echo -e "${BRIGHT_CYAN}YutubuDownload, v2.0.0${RESET}"
 
 # === SMART COOKIE REFRESH ===
-echo -e "${SKY_BLUE}🔄 Preparing Chrome cookies (Tanzania-optimized)...${RESET}"
-pkill -f "chrome" 2>/dev/null || true
-pkill -f "chromium" 2>/dev/null || true
-pkill -f "crashpad" 2>/dev/null || true
-
-print_loading "⏳ Unlocking cookies"
-
-google-chrome-stable --no-startup-window 2>/dev/null &
-CHROME_PID=$!
-sleep 3
-kill $CHROME_PID 2>/dev/null || true
-wait $CHROME_PID 2>/dev/null || true
-echo -e "${LIME}✅ Cookies refreshed in 8 seconds${RESET}"
+echo -e "${SKY_BLUE}🔄 Preparing shared cookies (multi-instance safe)...${RESET}"
+echo -e "${SKY_BLUE}   • One shared cookies.txt file${RESET}"
+echo -e "${SKY_BLUE}   • Locked refresh only, no browser killing${RESET}"
 echo ""
 
 # === ROBUST DBUS SESSION SETUP ===
@@ -507,6 +624,10 @@ else
 fi
 echo ""
 
+# Refresh shared cookies once the Python environment is ready.
+ensure_cookie_store
+echo ""
+
 # Dependency checks
 if ! command -v yt-dlp &> /dev/null; then
     print_error "❌ ERROR: yt-dlp not found!"
@@ -536,6 +657,15 @@ else
     echo -e "   ${CYAN}curl -fsSL https://deno.land/install.sh | sh${RESET}"
 fi
 echo ""
+
+CONCURRENT_FRAGMENTS="${YTDL_CONCURRENT_FRAGMENTS:-1}"
+if [[ ! "$CONCURRENT_FRAGMENTS" =~ ^[0-9]+$ ]] || [[ "$CONCURRENT_FRAGMENTS" -lt 1 ]]; then
+    CONCURRENT_FRAGMENTS=1
+fi
+CONCURRENT_FRAGMENT_FLAG=()
+if [[ "$CONCURRENT_FRAGMENTS" -gt 1 ]]; then
+    CONCURRENT_FRAGMENT_FLAG=(--concurrent-fragments "$CONCURRENT_FRAGMENTS")
+fi
 
 # === USER INPUTS ===
 
@@ -622,7 +752,7 @@ if [[ "$IS_MP3" == "false" ]]; then
     echo -e "${SKY_BLUE}🔍 Fetching available qualities...${RESET}"
     
     # Use shorter timeout for quality detection
-    ACTUAL_HEIGHTS=$(timeout 8 yt-dlp --cookies-from-browser chrome --no-playlist \
+    ACTUAL_HEIGHTS=$(timeout 8 yt-dlp --cookies "$COOKIE_FILE" --no-playlist \
         --print "%(height)s" \
         --no-warnings \
         --quiet \
@@ -660,7 +790,26 @@ if [[ "$IS_MP3" == "false" ]]; then
         MAX_HEIGHT=720
     fi
     
-    FORMAT="bestvideo[height<=${MAX_HEIGHT}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${MAX_HEIGHT}][ext=mp4]/bestvideo[height<=${MAX_HEIGHT}]+bestaudio/best[height<=${MAX_HEIGHT}]"
+    CHOSEN_HEIGHT="$MAX_HEIGHT"
+    if [[ -n "$ACTUAL_HEIGHTS" ]] && [[ ! " $ACTUAL_HEIGHTS " =~ " $MAX_HEIGHT " ]]; then
+        FALLBACK_HEIGHT=""
+        for h in $ACTUAL_HEIGHTS; do
+            if [[ "$h" -le "$MAX_HEIGHT" ]]; then
+                FALLBACK_HEIGHT="$h"
+                break
+            fi
+        done
+
+        if [[ -n "$FALLBACK_HEIGHT" ]]; then
+            CHOSEN_HEIGHT="$FALLBACK_HEIGHT"
+            echo -e "${YELLOW}⚠️  Exact ${MAX_HEIGHT}p is not available. Using ${CHOSEN_HEIGHT}p instead.${RESET}"
+        else
+            CHOSEN_HEIGHT="$MAX_HEIGHT"
+            echo -e "${YELLOW}⚠️  No lower exact match found. yt-dlp will try the closest available format.${RESET}"
+        fi
+    fi
+
+    FORMAT="bestvideo[height=${CHOSEN_HEIGHT}][ext=mp4]+bestaudio[ext=m4a]/best[height=${CHOSEN_HEIGHT}][ext=mp4]/bestvideo[height=${CHOSEN_HEIGHT}]+bestaudio/best[height=${CHOSEN_HEIGHT}]"
 else
     MAX_HEIGHT="N/A"
 fi
@@ -687,9 +836,11 @@ if [[ "$IS_PLAYLIST" == "true" ]]; then
         read -r FOLDER_NAME || FOLDER_NAME=""
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
         FOLDER_NAME="${FOLDER_NAME:-%(playlist_title)s [%(playlist_id)s]}"
-        OUTPUT_TEMPLATE="${FOLDER_NAME}/%(playlist_index)02d - %(title)s.%(ext)s"
+        OUTPUT_TEMPLATE="${FOLDER_NAME}/${SESSION_ID}/%(playlist_index)02d - %(title)s.%(ext)s"
+        OUTPUT_ROOT_DISPLAY="${FOLDER_NAME}/${SESSION_ID}"
     else
-        OUTPUT_TEMPLATE="%(playlist_index)02d - %(title)s.%(ext)s"
+        OUTPUT_TEMPLATE="${SESSION_ID}/%(playlist_index)02d - %(title)s.%(ext)s"
+        OUTPUT_ROOT_DISPLAY="${SESSION_ID}"
     fi
 else
     echo -n -e "${CYAN}Save in custom folder? (${BRIGHT_CYAN}y${RESET}/${BRIGHT_CYAN}n${RESET}) [default=n]: ${RESET}"
@@ -702,10 +853,18 @@ else
         read -r FOLDER_NAME || FOLDER_NAME="Downloads"
         FOLDER_NAME=$(echo "$FOLDER_NAME" | xargs)
         FOLDER_NAME="${FOLDER_NAME:-Downloads}"
-        OUTPUT_TEMPLATE="${FOLDER_NAME}/%(title)s.%(ext)s"
+        OUTPUT_TEMPLATE="${FOLDER_NAME}/${SESSION_ID}/%(title)s.%(ext)s"
+        OUTPUT_ROOT_DISPLAY="${FOLDER_NAME}/${SESSION_ID}"
+    else
+        OUTPUT_TEMPLATE="${SESSION_ID}/%(title)s.%(ext)s"
+        OUTPUT_ROOT_DISPLAY="${SESSION_ID}"
     fi
 fi
 echo ""
+
+if [[ -n "${OUTPUT_ROOT_DISPLAY:-}" ]] && [[ "$OUTPUT_ROOT_DISPLAY" != *"%("* ]]; then
+    mkdir -p "$OUTPUT_ROOT_DISPLAY" 2>/dev/null || true
+fi
 
 # === SHOW METADATA BEFORE DOWNLOAD ===
 get_and_display_metadata "$URL" "$IS_PLAYLIST"
@@ -717,8 +876,9 @@ echo -e "${BRIGHT_MAGENTA}══════════════════
 echo -e "${CYAN}URL:${RESET}          $URL"
 echo -e "${CYAN}Type:${RESET}         $( [[ "$IS_PLAYLIST" == "true" ]] && echo "${BRIGHT_GREEN}Playlist (ALL videos)${RESET}" || echo "${BRIGHT_BLUE}Single Video ONLY${RESET}" )"
 echo -e "${CYAN}Format:${RESET}       $( [[ "$IS_MP3" == "true" ]] && echo "${BRIGHT_MAGENTA}MP3 ($AUDIO_QUAL)${RESET}" || echo "${BRIGHT_BLUE}Video (max ${MAX_HEIGHT}p) WITH AUDIO${RESET}" )"
-echo -e "${CYAN}Destination:${RESET}  $( [[ "$USE_FOLDER" == "true" ]] && echo "${BRIGHT_YELLOW}$FOLDER_NAME${RESET}" || echo "${BRIGHT_YELLOW}Current directory${RESET}" )"
+echo -e "${CYAN}Destination:${RESET}  ${BRIGHT_YELLOW}${OUTPUT_ROOT_DISPLAY:-$SESSION_ID}${RESET}"
 echo -e "${CYAN}JS Runtime:${RESET}   $( [[ -n "$JS_RUNTIME" ]] && echo "${BRIGHT_GREEN}${JS_RUNTIME##*=}${RESET}" || echo "${ORANGE}None${RESET}" )"
+echo -e "${CYAN}Fragments:${RESET}    $( [[ "$CONCURRENT_FRAGMENTS" -gt 1 ]] && echo "${BRIGHT_GREEN}$CONCURRENT_FRAGMENTS${RESET}" || echo "${BRIGHT_YELLOW}1${RESET}" )"
 echo -e "${CYAN}Resume/Skip:${RESET}   ${BRIGHT_GREEN}File-based (auto-resume & skip)${RESET}"
 echo -e "${BRIGHT_MAGENTA}══════════════════════════════════════════════════════════════════════${RESET}"
 echo ""
@@ -759,12 +919,13 @@ yt-dlp \
     -f "$FORMAT" \
     -o "$OUTPUT_TEMPLATE" \
     $JS_RUNTIME \
-    --cookies-from-browser chrome \
+    --cookies "$COOKIE_FILE" \
     --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
     --ignore-errors \
     --continue \
     --no-overwrites \
     --merge-output-format mp4 \
+    "${CONCURRENT_FRAGMENT_FLAG[@]}" \
     --newline \
     --no-warnings \
     --progress \
@@ -775,7 +936,7 @@ yt-dlp \
     --file-access-retries 3 \
     --console-title \
     "$URL" 2>&1
-} | while IFS= read -r line || [[ -n "$line" ]]; do
+} | tee -a "$SESSION_LOG_FILE" | while IFS= read -r line || [[ -n "$line" ]]; do
     
     # Skip video ID lines
     if [[ "$line" =~ ^[A-Za-z0-9_-]{11}$ ]]; then
@@ -929,14 +1090,6 @@ yt-dlp \
         continue
     fi
     
-    # If we get here and the line contains progress-like info but didn't match above patterns
-    if [[ "$line" =~ ETA: ]] || [[ "$line" =~ [0-9]+\.[0-9]+% ]]; then
-        # Try to extract and display minimal progress info
-        percent=$(echo "$line" | grep -o '[0-9]\+\.[0-9]\+%' | head -1 | sed 's/%//' || echo "0")
-        if [[ -n "$percent" ]]; then
-            show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "--:--" "?" "${CURRENT_TITLE:-Video}" "$IS_PLAYLIST" "?"
-        fi
-    fi
 done
 
 # Capture exit status
@@ -964,7 +1117,7 @@ if [[ "$DOWNLOAD_SUCCESS" == false ]]; then
     echo -e ""
     echo -e "${CYAN}   🔧 TECHNICAL FIX:${RESET}"
     echo -e "     • Check your internet connection"
-    echo -e "     • Try without cookies: Edit script and remove '--cookies-from-browser chrome'"
+    echo -e "     • Refresh shared cookies: delete ~/.config/YutubuDownload/cookies.txt and rerun"
     echo -e "     • Update yt-dlp: sudo yt-dlp -U"
     echo -e "     • Use mobile hotspot if WiFi is unstable"
     exit 1
@@ -1029,11 +1182,19 @@ cat << 'EOF'
     ¨¨¨¨¨¨¨¨˜˜˜˜˜˜˜˜''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''˜˜˜˜˜˜˜˜˜˜˜¨
 EOF
 echo -e "\033[0m"
+
 ```
 
 ---
 
 ## 📋 Changelog
+
+### v2.0.0 (2026-04-20)
+- **Added**: Multi-instance architecture for separate terminal workers
+- **Added**: Shared cookie export file and lock-based refresh
+- **Added**: Session output root/temp/log isolation
+- **Added**: Configurable `YTDL_CONCURRENT_FRAGMENTS`
+- **Improved**: Better quality selection behavior and progress output
 
 ### v1.1.6 (2026-02-10)
 - **Fixed**: Progress bar display - now shows single clean line
@@ -1073,7 +1234,7 @@ YutubuDownload
 ### Check Version
 ```bash
 YutubuDownload --version
-# Output: YutubuDownload v1.1.6 (2026-02-10) • Tanzania-Optimized • CLEAN PROGRESS BAR
+# Output: YutubuDownload v2.0.0 (2026-04-20) • Tanzania-Optimized • MULTI-INSTANCE + SHARED COOKIES
 ```
 
 ### Critical Tanzania-Specific Tips  
@@ -1116,7 +1277,7 @@ YutubuDownload --version
 ---
 
 ## 🚀 Future Roadmap
-- [ ] Parallel download support
+- [x] Parallel download support
 - [ ] Download queue management  
 - [ ] Automatic quality selection based on network speed
 - [ ] GUI wrapper option
@@ -1135,7 +1296,7 @@ YutubuDownload --version
 ⭐ **If this saves you time/data in Tanzania, please star the repo!**  
 [![GitHub Stars](https://img.shields.io/github/stars/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal?style=social)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal)  
 
-**"YutubuDownload v1.1.6: Because clean progress bars matter when you're counting every megabyte in Tanzania"**  
+**"YutubuDownload v2.0.0: Multi-instance downloads with shared cookies for Tanzania"**  
 — Johnbosco, Dar es Salaam 🇹🇿  
 
 </div>

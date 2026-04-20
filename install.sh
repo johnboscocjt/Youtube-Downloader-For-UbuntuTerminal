@@ -34,7 +34,7 @@ cat << 'EOF'
                                                                                                                                        
 EOF
 echo "        Y U T U B U D O W N L O A D   I N S T A L L E R                  "
-echo "            Tanzania-Optimized • v1.1.8 • Feb 10, 2026                   "
+echo "            Tanzania-Optimized • v2.0.0 • Apr 20, 2026                   "
 echo ""
 
 # Helper function to check if package is installed
@@ -186,7 +186,7 @@ else
     print_loading "   ⬇️  Creating root Python venv"
     python3 -m venv yt-venv > /dev/null 2>&1
     source yt-venv/bin/activate
-    pip install -q secretstorage cryptography > /dev/null 2>&1
+    pip install -q secretstorage cryptography browser-cookie3 > /dev/null 2>&1
     deactivate
     echo "   ✅ Root Python venv setup complete"
 fi
@@ -199,7 +199,7 @@ if [ "$CURRENT_USER" != "root" ] && [ "$CURRENT_USER" != "" ]; then
     else
         print_loading "   ⬇️  Creating user Python venv"
         sudo -u "$CURRENT_USER" python3 -m venv "$USER_DIR/yt-venv" > /dev/null 2>&1
-        sudo -u "$CURRENT_USER" bash -c "source $USER_DIR/yt-venv/bin/activate && pip install -q secretstorage cryptography > /dev/null 2>&1"
+        sudo -u "$CURRENT_USER" bash -c "source $USER_DIR/yt-venv/bin/activate && pip install -q secretstorage cryptography browser-cookie3 > /dev/null 2>&1"
         echo "   ✅ User Python venv setup complete"
     fi
 fi
@@ -241,11 +241,11 @@ echo "║                                                                       
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
 
-echo "YUTUBUDOWNLOAD v1.1.8 • TANZANIA'S TERMINAL POWER  "
+echo "YUTUBUDOWNLOAD v2.0.0 • TANZANIA'S TERMINAL POWER  "
 echo "Fast • Reliable • Bot-Bypass • Designed for TZ Networks"
 echo ""
 
-echo "Version: YutubuDownload v1.0 (2026-02-08)"
+echo "Version: YutubuDownload v2.0.0 (2026-04-20)"
 echo "Repository: https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal"
 echo ""
 

@@ -16,12 +16,12 @@
    ░░░░░      ░░░░░░░░    ░░░░░    ░░░░░░░░ ░░░░░░░░    ░░░░░░░░ ░░░░░░░░░░    ░░░░░░     ░░░░ ░░░░    ░░░░ ░░░░░ ░░░░░  ░░░░░░   ░░░░░░░░  ░░░░░░░░ 
 ```
 
-**Author:** Johnbosco | **Last Updated:** February 10, 2026  
-**Version:** v1.1.9 — *Better Progress + Quality Fix Edition*  
+**Author:** Johnbosco | **Last Updated:** April 20, 2026  
+**Version:** v2.0.0 — *Multi-Instance Shared-Cookie Edition*  
 🌍 *Tested across Dar es Salaam, Mwanza, Arusha & Zanzibar networks*  
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal)  
-[![Version](https://img.shields.io/badge/Version-1.1.9-brightgreen)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/releases/tag/v1.1.9)
+[![Version](https://img.shields.io/badge/Version-2.0.0-brightgreen)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/releases/tag/v2.0.0)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 </div>
@@ -31,7 +31,15 @@
 
 ---
 
-## 🆕 What's New in v1.1.9?
+## 🆕 What's New in v2.0.0?
+
+### 🧠 **MULTI-INSTANCE ARCHITECTURE (MAJOR RELEASE)**
+- **Added**: Safe multi-terminal downloads with per-run `SESSION_ID`
+- **Added**: Shared `cookies.txt` store with file-lock refresh model
+- **Added**: Session-specific temp/log folders for clean isolation
+- **Added**: Unique output roots per session to prevent cross-terminal overwrite
+- **Added**: Optional fragment tuning via `YTDL_CONCURRENT_FRAGMENTS`
+- **Removed**: Browser process killing flow (`pkill chrome/chromium`)
 
 ### 🚀 **BETTER PROGRESS BAR + QUALITY PICKING**
 - **Fixed**: Progress output now stays cleaner as a single terminal line
@@ -51,7 +59,7 @@
 - **Real-time File Size**: See download size as it progresses
 - **Color-coded Elements**: Consistent terminal coloring
 - **Smooth Updates**: Proper carriage returns for single-line updates
-- **Exclusive Instance**: Operates as a single terminal session; does not support multiple simultaneous instances.
+- **Multi-Instance Ready**: Supports concurrent terminal sessions with isolated state.
 
 ---
 
@@ -152,7 +160,7 @@ For detailed setup, troubleshooting, and advanced usage:
 sudo bash -c "$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)"
 ```
 
-## OR Manual Update to v1.1.9:
+## OR Manual Update to v2.0.0:
 ```bash
 # Fetch latest version
 sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload
@@ -160,7 +168,7 @@ sudo chmod +x /usr/local/bin/YutubuDownload
 
 # Check version
 YutubuDownload --version
-# Should show: YutubuDownload v1.1.9 (2026-04-20) • Tanzania-Optimized • BETTER PROGRESS + QUALITY FIX
+# Should show: YutubuDownload v2.0.0 (2026-04-20) • Tanzania-Optimized • MULTI-INSTANCE + SHARED COOKIES
 ```
 
 ---
@@ -198,7 +206,7 @@ YutubuDownload --version
 
 <br />
 
-### **7. New Version : v1.1.9**
+### **7. New Version : v2.0.0**
 ![Completion Screen](Screenshots/a.png)
 ![Completion Screen](Screenshots/b.png)
 ![Completion Screen](Screenshots/c.png)
@@ -217,6 +225,14 @@ YutubuDownload --version
 ---
 
 ## 📋 Changelog
+
+### v2.0.0 (2026-04-20)
+- **Added**: Multi-instance safe architecture for parallel terminal usage
+- **Added**: Shared cookie service (`cookies.txt`) with refresh locking
+- **Added**: Per-session output root, temp dir, and log file isolation
+- **Added**: `YTDL_CONCURRENT_FRAGMENTS` environment tuning for strong networks
+- **Improved**: Better quality selection reliability for exact resolution picks
+- **Improved**: Better single-line progress behavior on unstable links
 
 ### v1.1.9 (2026-04-20)
 - **Fixed**: Better single-line progress behavior on unstable/slow networks
@@ -257,7 +273,7 @@ YutubuDownload --version
 ---
 
 ## 🚀 Future Roadmap
-- [ ] Parallel download support
+- [x] Parallel download support
 - [ ] Download queue management  
 - [ ] Automatic quality selection based on network speed
 - [ ] GUI wrapper option
@@ -276,7 +292,7 @@ YutubuDownload --version
 ⭐ **If this saves you time/data in Tanzania, please star the repo!**  
 [![GitHub Stars](https://img.shields.io/github/stars/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal?style=social)](https://github.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal)  
 
-**"YutubuDownload v1.1.9: Better progress bars and reliable quality selection for Tanzania"**  
+**"YutubuDownload v2.0.0: Multi-instance downloads with shared cookies for Tanzania"**  
 — Johnbosco, Dar es Salaam 🇹🇿  
 
 </div>
