@@ -89,7 +89,10 @@ show_progress_bar() {
     local is_playlist="$7"
     local file_size="$8"
     
-    local BAR_WIDTH=20
+    local terminal_width=$(tput cols 2>/dev/null || echo 80)
+    [[ "$terminal_width" =~ ^[0-9]+$ ]] || terminal_width=80
+
+    local BAR_WIDTH=14
     local percent_int=$(printf "%.0f" "$percent")
     [ $percent_int -gt 100 ] && percent_int=100
     [ $percent_int -lt 0 ] && percent_int=0
@@ -99,8 +102,10 @@ show_progress_bar() {
     local bar=$(printf '█%.0s' $(seq 1 "$filled"))
     local empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
     
-    # Truncate title if too long
-    local max_title_length=20
+    # Truncate title so the full status line stays on one terminal row.
+    local max_title_length=$((terminal_width - 52))
+    [ $max_title_length -gt 20 ] && max_title_length=20
+    [ $max_title_length -lt 8 ] && max_title_length=8
     if [ ${#title} -gt $max_title_length ]; then
         title="${title:0:$((max_title_length-3))}..."
     fi
@@ -111,16 +116,11 @@ show_progress_bar() {
         video_id_short="${BASH_REMATCH[1]:0:8}"
     fi
     
-    # Clear the entire line and print on single line
-    printf "\r\033[K"
-    
-    if [[ "$is_playlist" == "true" ]] && [ "$total" != "1" ] && [ "$total" != "0" ]; then
-        printf "${BRIGHT_CYAN}%s${RESET} ${YELLOW}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}" \
-            "$title" "$video_id_short" "$bar" "$empty" "$percent" "$file_size" "$eta" "$speed"
-    else
-        printf "${BRIGHT_CYAN}%s${RESET} ${YELLOW}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}" \
-            "$title" "$video_id_short" "$bar" "$empty" "$percent" "$file_size" "$eta" "$speed"
-    fi
+    # Clear the entire line and print on a single row.
+    printf "\r\033[2K"
+
+    printf "${BRIGHT_CYAN}%s${RESET} ${YELLOW}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}" \
+        "$title" "$video_id_short" "$bar" "$empty" "$percent" "$file_size" "$eta" "$speed"
 }
 
 # Function to get and display metadata BEFORE download - WITH ROBUST TIMEOUTS
@@ -454,7 +454,26 @@ if [[ "$IS_MP3" == "false" ]]; then
         MAX_HEIGHT=720
     fi
     
-    FORMAT="bestvideo[height<=${MAX_HEIGHT}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${MAX_HEIGHT}][ext=mp4]/bestvideo[height<=${MAX_HEIGHT}]+bestaudio/best[height<=${MAX_HEIGHT}]"
+    CHOSEN_HEIGHT="$MAX_HEIGHT"
+    if [[ -n "$ACTUAL_HEIGHTS" ]] && [[ ! " $ACTUAL_HEIGHTS " =~ " $MAX_HEIGHT " ]]; then
+        FALLBACK_HEIGHT=""
+        for h in $ACTUAL_HEIGHTS; do
+            if [[ "$h" -le "$MAX_HEIGHT" ]]; then
+                FALLBACK_HEIGHT="$h"
+                break
+            fi
+        done
+
+        if [[ -n "$FALLBACK_HEIGHT" ]]; then
+            CHOSEN_HEIGHT="$FALLBACK_HEIGHT"
+            echo -e "${YELLOW}⚠️  Exact ${MAX_HEIGHT}p is not available. Using ${CHOSEN_HEIGHT}p instead.${RESET}"
+        else
+            CHOSEN_HEIGHT="$MAX_HEIGHT"
+            echo -e "${YELLOW}⚠️  No lower exact match found. yt-dlp will try the closest available format.${RESET}"
+        fi
+    fi
+
+    FORMAT="bestvideo[height=${CHOSEN_HEIGHT}][ext=mp4]+bestaudio[ext=m4a]/best[height=${CHOSEN_HEIGHT}][ext=mp4]/bestvideo[height=${CHOSEN_HEIGHT}]+bestaudio/best[height=${CHOSEN_HEIGHT}]"
 else
     MAX_HEIGHT="N/A"
 fi
@@ -723,14 +742,6 @@ yt-dlp \
         continue
     fi
     
-    # If we get here and the line contains progress-like info but didn't match above patterns
-    if [[ "$line" =~ ETA: ]] || [[ "$line" =~ [0-9]+\.[0-9]+% ]]; then
-        # Try to extract and display minimal progress info
-        percent=$(echo "$line" | grep -o '[0-9]\+\.[0-9]\+%' | head -1 | sed 's/%//' || echo "0")
-        if [[ -n "$percent" ]]; then
-            show_progress_bar "$percent" "$CURRENT_ITEM" "$TOTAL_ITEMS" "--:--" "?" "${CURRENT_TITLE:-Video}" "$IS_PLAYLIST" "?"
-        fi
-    fi
 done
 
 # Capture exit status
