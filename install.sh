@@ -185,11 +185,14 @@ if [ -f "yt-venv/bin/activate" ]; then
 else
     print_loading "   ⬇️  Creating root Python venv"
     python3 -m venv yt-venv > /dev/null 2>&1
-    source yt-venv/bin/activate
-    pip install -q secretstorage cryptography browser-cookie3 > /dev/null 2>&1
-    deactivate
     echo "   ✅ Root Python venv setup complete"
 fi
+
+print_loading "   🔧 Ensuring root cookie Python dependencies"
+source yt-venv/bin/activate
+pip install -q secretstorage cryptography browser-cookie3 > /dev/null 2>&1
+deactivate
+echo "   ✅ Root cookie Python dependencies ready"
 
 if [ "$CURRENT_USER" != "root" ] && [ "$CURRENT_USER" != "" ]; then
     mkdir -p "$USER_DIR" 2>/dev/null
@@ -199,9 +202,12 @@ if [ "$CURRENT_USER" != "root" ] && [ "$CURRENT_USER" != "" ]; then
     else
         print_loading "   ⬇️  Creating user Python venv"
         sudo -u "$CURRENT_USER" python3 -m venv "$USER_DIR/yt-venv" > /dev/null 2>&1
-        sudo -u "$CURRENT_USER" bash -c "source $USER_DIR/yt-venv/bin/activate && pip install -q secretstorage cryptography browser-cookie3 > /dev/null 2>&1"
         echo "   ✅ User Python venv setup complete"
     fi
+
+    print_loading "   🔧 Ensuring user cookie Python dependencies"
+    sudo -u "$CURRENT_USER" bash -c "source $USER_DIR/yt-venv/bin/activate && pip install -q secretstorage cryptography browser-cookie3 > /dev/null 2>&1"
+    echo "   ✅ User cookie Python dependencies ready"
 fi
 
 # STEP 5: YutubuDownload script

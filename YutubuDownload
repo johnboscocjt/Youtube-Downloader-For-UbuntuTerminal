@@ -410,6 +410,28 @@ else
 fi
 echo ""
 
+# Ensure browser_cookie3 is available for shared cookie export.
+if ! python3 -c "import browser_cookie3" >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠️  browser-cookie3 not found in active Python environment${RESET}"
+    echo -e "${SKY_BLUE}🔧 Attempting auto-fix (installing browser-cookie3)...${RESET}"
+
+    if command -v pip >/dev/null 2>&1; then
+        pip install -q browser-cookie3 >/dev/null 2>&1 || true
+    else
+        python3 -m pip install -q browser-cookie3 >/dev/null 2>&1 || true
+    fi
+
+    if python3 -c "import browser_cookie3" >/dev/null 2>&1; then
+        echo -e "${LIME}✅ browser-cookie3 installed successfully${RESET}"
+    else
+        print_error "❌ browser-cookie3 is still missing"
+        echo "   Run installer again to repair dependencies:"
+        echo -e "   ${CYAN}sudo bash -c '\$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/install.sh)'${RESET}"
+        exit 1
+    fi
+fi
+echo ""
+
 # Refresh shared cookies once the Python environment is ready.
 ensure_cookie_store
 echo ""
