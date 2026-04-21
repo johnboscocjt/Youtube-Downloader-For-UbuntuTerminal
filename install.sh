@@ -239,7 +239,7 @@ echo "║                                                                       
 echo "║   Next steps:                                                                ║"
 echo "║ 1. CLOSE ALL CHROME WINDOWS COMPLETELY (required for cookies)                ║"
 echo "║ 2. Open terminal and run:                                                    ║"
-echo "║    cd ~/youtubedownloading && ytd                                            ║"
+echo "║    ytd                                                                        ║"
 echo "║ 3. Paste YouTube URL when prompted                                           ║"
 echo "║                                                                              ║"
 echo "║   💡 Tanzania Tip: Run during off-peak hours (after 10 PM EAT)               ║"
@@ -269,8 +269,8 @@ if [ -n "$CURRENT_USER" ] && [ "$CURRENT_USER" != "root" ]; then
         echo ""
         echo "💡 IMPORTANT: Since you have Deno as user '$CURRENT_USER',"
         echo "   run ytd WITHOUT sudo:"
-        echo "   cd ~/youtubedownloading && ytd"
-        echo "   cd to any directory of your choice, or use the above option"
+        echo "   ytd"
+        echo "   run from any directory of your choice"
     fi
 fi
 echo ""
