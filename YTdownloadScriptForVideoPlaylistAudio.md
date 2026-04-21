@@ -160,6 +160,28 @@ sudo bash -c "$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-
 
 ---
 
+## 🖥️ Platform Support
+
+- **Linux (Ubuntu/Debian and similar)**: Fully supported.
+- **Windows**: Use **WSL (Windows Subsystem for Linux)** or a Linux virtual machine, because this tool is Unix shell based.
+- **macOS**: Supported (Unix-based). Install equivalent dependencies with Homebrew (`ffmpeg`, `python3`, `pip`, `yt-dlp`, `deno`).
+
+This toolchain is **distro-agnostic and Unix-based**.
+
+---
+
+## 📈 Why v2.0.0 Is More Powerful Than Typical Wrappers
+
+| Capability | v2.0.0 ytd | Typical wrapper |
+|---|---|---|
+| Parallel terminal safety | ✅ Lock + isolated session state | ⚠️ Often conflicts |
+| Cookie refresh design | ✅ Shared file + lock coordination | ⚠️ Usually ad-hoc |
+| Quality control | ✅ Exact targeting + fallback logic | ⚠️ Best-effort only |
+| Progress behavior | ✅ Single-line default + adaptive fallback | ⚠️ Noisy or misleading |
+| Output organization | ✅ Predictable single/playlist routing | ⚠️ Easy to mix files |
+
+---
+
 ## ❓ Why YutubuDownload Exists  
 *(Solving Real 2026 YouTube Challenges)*  
 
@@ -451,6 +473,7 @@ show_progress_bar() {
     local is_playlist="$7"
     local file_size="$8"
     local mode="${9:-detailed}"
+    local single_line="${PROGRESS_SINGLE_LINE:-false}"
     
     local terminal_width=$(tput cols 2>/dev/null || echo 80)
     [[ "$terminal_width" =~ ^[0-9]+$ ]] || terminal_width=80
@@ -465,20 +488,30 @@ show_progress_bar() {
     local bar=$(printf '█%.0s' $(seq 1 "$filled"))
     local empty=$(printf '░%.0s' $(seq 1 $((BAR_WIDTH - filled))))
     
-    # Truncate title so each progress update stays compact.
+    # Truncate title only when necessary, so good-network output stays readable.
     local max_title_length=$((terminal_width - 52))
-    [ $max_title_length -gt 24 ] && max_title_length=24
-    [ $max_title_length -lt 8 ] && max_title_length=8
+    [ $max_title_length -gt 60 ] && max_title_length=60
+    [ $max_title_length -lt 12 ] && max_title_length=12
     if [ ${#title} -gt $max_title_length ]; then
         title="${title:0:$((max_title_length-3))}..."
     fi
 
-    if [[ "$mode" == "low" ]]; then
-        printf "${BRIGHT_CYAN}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ${BRIGHT_YELLOW}low-network${RESET}\n" \
-            "$title" "$bar" "$empty" "$percent" "$file_size"
+    if [[ "$single_line" == "true" ]]; then
+        if [[ "$mode" == "low" ]]; then
+            printf "\r\033[2K${BRIGHT_CYAN}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ${BRIGHT_YELLOW}low-network${RESET}" \
+                "$title" "$bar" "$empty" "$percent" "$file_size"
+        else
+            printf "\r\033[2K${BRIGHT_CYAN}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}" \
+                "$title" "$bar" "$empty" "$percent" "$file_size" "$eta" "$speed"
+        fi
     else
-        printf "${BRIGHT_CYAN}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}\n" \
-            "$title" "$bar" "$empty" "$percent" "$file_size" "$eta" "$speed"
+        if [[ "$mode" == "low" ]]; then
+            printf "${BRIGHT_CYAN}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ${BRIGHT_YELLOW}low-network${RESET}\n" \
+                "$title" "$bar" "$empty" "$percent" "$file_size"
+        else
+            printf "${BRIGHT_CYAN}%s${RESET} ${GREEN}%s%s${RESET} ${YELLOW}%.1f%%${RESET} | ${CYAN}%s${RESET} | ETA: ${YELLOW}%s${RESET} | ${CYAN}%s${RESET}\n" \
+                "$title" "$bar" "$empty" "$percent" "$file_size" "$eta" "$speed"
+        fi
     fi
 }
 
@@ -965,6 +998,10 @@ CURRENT_PROGRESS=""
 LOW_NETWORK_PROGRESS=false
 LOW_NETWORK_WEAK_STREAK=0
 LOW_NETWORK_STABLE_STREAK=0
+PROGRESS_SINGLE_LINE=false
+if [ -t 1 ]; then
+    PROGRESS_SINGLE_LINE=true
+fi
 
 mark_low_network_progress() {
     local immediate="${1:-false}"
@@ -1088,13 +1125,13 @@ yt-dlp \
         if [[ "$line" =~ (Retrying|HTTP\ Error|connection\ reset|fragment|unable\ to\ download) ]]; then
             mark_low_network_progress "true"
         elif [[ "$speed" =~ ^0B/s$ ]]; then
-            mark_low_network_progress
+            awk 'BEGIN{exit !('"$percent"' >= 10)}' && mark_low_network_progress
         elif [[ "$speed" =~ ^([0-9]+\.?[0-9]*)([KMGT])iB/s$ ]]; then
             speed_value="${BASH_REMATCH[1]}"
             speed_unit_flag="${BASH_REMATCH[2]}"
             case "$speed_unit_flag" in
                 K)
-                    awk 'BEGIN{exit !('"$speed_value"' <= 64)}' && mark_low_network_progress
+                    awk 'BEGIN{exit !('"$percent"' >= 10 && '"$speed_value"' <= 32)}' && mark_low_network_progress
                     awk 'BEGIN{exit !('"$speed_value"' >= 256)}' && mark_network_stable
                     ;;
                 M|G|T)
@@ -1155,15 +1192,24 @@ yt-dlp \
         file_size="${file_size_num}${file_size_unit}iB"
         
         # Show completion on its own line
-        echo ""
+        if [[ "$PROGRESS_SINGLE_LINE" == "true" ]]; then
+            printf "\r\033[2K\n"
+        else
+            echo ""
+        fi
         echo -e "${BRIGHT_GREEN}✓ Downloaded:${RESET} ${BRIGHT_CYAN}${CURRENT_TITLE:-Video}${RESET} ${CYAN}[${file_size}]${RESET}"
         VIDEO_COMPLETE=true
+        CURRENT_PROGRESS=""
         continue
     fi
     
     # Parse extraction/merging completion
     if ([[ "$line" =~ \[ExtractAudio\].*Destination: ]] || [[ "$line" =~ \[Merger\].*Merging.*into ]]) && ! $VIDEO_COMPLETE; then
-        echo ""
+        if [[ "$PROGRESS_SINGLE_LINE" == "true" ]]; then
+            printf "\r\033[2K\n"
+        else
+            echo ""
+        fi
         if [[ "$line" =~ \/([^/]+)\.[^./]+$ ]]; then
             file_title="${BASH_REMATCH[1]}"
             file_title=$(echo "$file_title" | sed -E 's/^[0-9]{2,} - //')
@@ -1172,11 +1218,17 @@ yt-dlp \
             echo -e "${BRIGHT_GREEN}✓ Processing completed${RESET}"
         fi
         VIDEO_COMPLETE=true
+        CURRENT_PROGRESS=""
         continue
     fi
     
     # Handle other yt-dlp output - show only if not in middle of progress display
     if [[ ! "$line" =~ ^\[download\]\ +[0-9] ]] && [[ "$line" =~ ^\[ ]]; then
+        if [[ "$PROGRESS_SINGLE_LINE" == "true" ]] && [[ -n "$CURRENT_PROGRESS" ]]; then
+            printf "\r\033[2K\n"
+            CURRENT_PROGRESS=""
+        fi
+
         if [[ "$line" =~ (Retrying|HTTP\ Error|connection\ reset|unable\ to\ download|fragment\ retries) ]]; then
             mark_low_network_progress "true"
         fi
@@ -1293,6 +1345,7 @@ cat << 'EOF'
     ¨¨¨¨¨¨¨¨˜˜˜˜˜˜˜˜''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''˜˜˜˜˜˜˜˜˜˜˜¨
 EOF
 echo -e "\033[0m"
+
 ```
 
 
@@ -1329,18 +1382,38 @@ echo -e "\033[0m"
 
 ## 🚀 Usage Guide  
 
-### Basic Workflow (Recommended)
+### Start Command
 ```bash
-# Always run from your download directory
-cd ~/youtubedownloading
 ytd
 ```
 
-### Global Usage (After Installation)
-```bash
-# Run from ANY directory
-ytd
-```
+### Follow-Through: Download a Single Video
+1. Run `ytd`
+2. Paste video URL
+3. Choose single video mode
+4. Choose output as video
+5. Select target quality
+6. Confirm and wait for completion
+
+### Follow-Through: Download Audio (MP3)
+1. Run `ytd`
+2. Paste URL (single video or playlist)
+3. Choose single or playlist mode
+4. Select MP3 output
+5. Choose audio quality (320k/192k/128k)
+6. Confirm and wait for extraction
+
+### Follow-Through: Download a Full Playlist
+1. Run `ytd`
+2. Paste playlist URL
+3. Choose playlist mode
+4. Keep playlist folder creation enabled
+5. Select video or MP3 output mode
+6. Confirm and monitor progress to 100%
+
+### What You Should See During Download
+- Good network: single-line progress with ETA and speed.
+- Very weak network: `low-network` label appears; this is adaptive mode, not a failure.
 
 ### Check Version
 ```bash

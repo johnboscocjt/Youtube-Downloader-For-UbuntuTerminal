@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ytd - Investor, Customer & Docs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: '#0b1320',
+            deep: '#111827',
+            accent: '#00b894',
+            accent2: '#0984e3',
+            sand: '#f7f4ea'
+          },
+          boxShadow: {
+            glow: '0 10px 30px rgba(0,184,148,.25)'
+          }
+        }
+      }
+    }
+  </script>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });
+  </script>
+  <style>
+    .grid-bg {
+      background-image: linear-gradient(rgba(9,132,227,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(9,132,227,.08) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-sand text-deep">
+  <header class="relative overflow-hidden">
+    <div class="absolute inset-0 grid-bg"></div>
+    <div class="relative max-w-6xl mx-auto px-6 py-16">
+      <p class="inline-block bg-accent/10 text-accent font-semibold px-3 py-1 rounded-full text-sm">ytd v2.0.0</p>
+      <h1 class="mt-4 text-4xl md:text-6xl font-black tracking-tight text-ink">Dangerously Reliable YouTube Downloads</h1>
+      <p class="mt-5 text-lg md:text-xl max-w-3xl text-slate-700">
+        ytd is a reliability-first downloader for unstable networks, anti-bot friction, and serious terminal workflows.
+        Think of this like a smart everyday delivery rider combined with a traffic expert and the power of auto-recovery.
+        It keeps your download moving when ordinary tools stop.
+      </p>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <span class="bg-white border border-slate-200 px-4 py-2 rounded-xl shadow-sm">Multi-instance safe</span>
+        <span class="bg-white border border-slate-200 px-4 py-2 rounded-xl shadow-sm">Shared cookie lock service</span>
+        <span class="bg-white border border-slate-200 px-4 py-2 rounded-xl shadow-sm">Adaptive progress intelligence</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 pb-20 space-y-14">
+    <section class="grid md:grid-cols-2 gap-6 -mt-8">
+      <article class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <h2 class="text-2xl font-bold text-ink">Downloader Power in Layman Language</h2>
+        <p class="mt-3 text-slate-700">Think of this like everyday stuff combined together:</p>
+        <ul class="mt-3 list-disc pl-5 space-y-1 text-slate-700">
+          <li>Think of this like a delivery rider + GPS + power bank combined with one mission: finish the trip.</li>
+          <li>You paste a link, and the power of this tool is that it prepares access, route, and retry behavior automatically.</li>
+          <li>If the road is bad (weak network), it does not panic; it changes style and keeps moving.</li>
+          <li>If one quality is not available, it safely chooses the next best one instead of failing hard.</li>
+          <li>The power of this is consistency: less confusion, fewer failed attempts, more finished downloads.</li>
+        </ul>
+      </article>
+      <article class="bg-ink text-white rounded-2xl p-6 shadow-glow">
+        <h2 class="text-2xl font-bold">Technical Explanation</h2>
+        <ul class="mt-3 list-disc pl-5 space-y-1 text-slate-200">
+          <li>Bash orchestration over yt-dlp + ffmpeg.</li>
+          <li>Deno-first JS challenge runtime, Node fallback.</li>
+          <li>Shared `cookies.txt` with lock-based refresh for concurrency safety.</li>
+          <li>Session-aware temp/log paths to avoid cross-instance collisions.</li>
+          <li>Adaptive UI: single-line detailed bar by default, low-network mode only when truly degraded.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="bg-white rounded-2xl p-6 md:p-8 border border-slate-100 shadow-sm">
+      <h2 class="text-3xl font-black text-ink">Docs Hub</h2>
+      <p class="mt-2 text-slate-600">Everything a user needs to follow through and download video, audio, or playlists confidently.</p>
+      <div class="mt-6 grid md:grid-cols-3 gap-4">
+        <article class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+          <h3 class="font-bold text-ink">How To Use</h3>
+          <ol class="mt-2 list-decimal pl-5 text-sm text-slate-700 space-y-1">
+            <li>Run <span class="font-semibold">ytd</span></li>
+            <li>Paste URL</li>
+            <li>Choose single or playlist</li>
+            <li>Choose video or MP3</li>
+            <li>Select quality and confirm</li>
+          </ol>
+        </article>
+        <article class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+          <h3 class="font-bold text-ink">Platform Notes</h3>
+          <ul class="mt-2 list-disc pl-5 text-sm text-slate-700 space-y-1">
+            <li>Linux: fully supported.</li>
+            <li>Windows: use WSL or a Linux VM.</li>
+            <li>macOS: supported because it is Unix based.</li>
+            <li>Distro-agnostic design across Unix-like systems.</li>
+          </ul>
+        </article>
+        <article class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+          <h3 class="font-bold text-ink">Network Behavior</h3>
+          <ul class="mt-2 list-disc pl-5 text-sm text-slate-700 space-y-1">
+            <li>Good network: full ETA + speed progress.</li>
+            <li>Very weak network: low-network adaptive mode.</li>
+            <li>Low-network mode means still downloading, not failing.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl p-6 md:p-8 border border-slate-100 shadow-sm">
+      <h2 class="text-3xl font-black text-ink">Technology Combination</h2>
+      <p class="mt-2 text-slate-600">Why this version is powerful: multiple reliability layers work together, not separately.</p>
+      <div class="mt-6 overflow-x-auto">
+        <div class="mermaid min-w-[780px]">
+flowchart LR
+    U[User] --> CLI[ytd CLI]
+    CLI --> ORCH[Bash Orchestrator]
+    ORCH --> CK[Cookie Service]
+    CK --> LOCK[Lock-based refresh]
+    CK --> CFILE[cookies.txt]
+    ORCH --> RT[Runtime Selector]
+    RT --> DENO[Deno]
+    RT --> NODE[Node fallback]
+    ORCH --> Q[Quality Resolver]
+    Q --> Y[yt-dlp]
+    ORCH --> F[ffmpeg]
+    ORCH --> P[Progress Controller]
+    P --> DETAILED[Detailed single-line UI]
+    P --> LOW[Low-network fallback UI]
+    ORCH --> O[Output Rules]
+    O --> S1[Single: current directory]
+    O --> S2[Playlist: grouped folder]
+        </div>
+      </div>
+    </section>
+
+    <section class="grid md:grid-cols-3 gap-5">
+      <article class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <h3 class="font-bold text-lg">Investor Value</h3>
+        <p class="mt-2 text-slate-700 text-sm">Strong differentiation in unreliable network regions. Reliability-focused UX increases trust and repeat usage.</p>
+      </article>
+      <article class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <h3 class="font-bold text-lg">Customer Value</h3>
+        <p class="mt-2 text-slate-700 text-sm">Fewer failed sessions, cleaner output organization, and clearer progress messages that reduce confusion.</p>
+      </article>
+      <article class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <h3 class="font-bold text-lg">Operational Value</h3>
+        <p class="mt-2 text-slate-700 text-sm">Multi-terminal safe architecture and controlled resource behavior simplify scaling usage across power users.</p>
+      </article>
+    </section>
+
+    <section class="bg-white rounded-2xl p-6 md:p-8 border border-slate-100 shadow-sm">
+      <h2 class="text-3xl font-black text-ink">Request Lifecycle</h2>
+      <div class="mt-5 overflow-x-auto">
+        <div class="mermaid min-w-[780px]">
+sequenceDiagram
+    participant User
+    participant App as ytd
+    participant Cookie as Cookie Service
+    participant Engine as yt-dlp + ffmpeg
+
+    User->>App: URL + options
+    App->>Cookie: Ensure cookie state
+    Cookie-->>App: Ready
+    App->>Engine: Start transfer
+    Engine-->>App: Progress telemetry
+    App-->>User: Detailed single-line progress
+    alt Network degrades hard
+      App-->>User: low-network fallback progress
+    end
+    Engine-->>App: Completed output
+    App-->>User: Final success message + location
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl p-6 md:p-8 border border-slate-100 shadow-sm">
+      <h2 class="text-3xl font-black text-ink">v2.0.0 Comparison</h2>
+      <div class="mt-4 overflow-x-auto">
+        <table class="w-full text-sm border-separate border-spacing-0">
+          <thead>
+            <tr>
+              <th class="text-left p-3 border-b border-slate-200">Capability</th>
+              <th class="text-left p-3 border-b border-slate-200">ytd v2.0.0</th>
+              <th class="text-left p-3 border-b border-slate-200">Typical wrapper</th>
+            </tr>
+          </thead>
+          <tbody class="text-slate-700">
+            <tr>
+              <td class="p-3 border-b border-slate-100">Multi-terminal safety</td>
+              <td class="p-3 border-b border-slate-100">Yes, lock + session isolation</td>
+              <td class="p-3 border-b border-slate-100">Often conflicting</td>
+            </tr>
+            <tr>
+              <td class="p-3 border-b border-slate-100">Cookie refresh model</td>
+              <td class="p-3 border-b border-slate-100">Shared controlled refresh</td>
+              <td class="p-3 border-b border-slate-100">Ad-hoc/manual</td>
+            </tr>
+            <tr>
+              <td class="p-3 border-b border-slate-100">Progress clarity</td>
+              <td class="p-3 border-b border-slate-100">Single-line + adaptive fallback</td>
+              <td class="p-3 border-b border-slate-100">Noisy or unstable</td>
+            </tr>
+            <tr>
+              <td class="p-3">Playlist organization</td>
+              <td class="p-3">Grouped and predictable</td>
+              <td class="p-3">Easy to mix files</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl p-6 md:p-8 border border-slate-100 shadow-sm">
+      <h2 class="text-3xl font-black text-ink">Screenshot Docs</h2>
+      <p class="mt-2 text-slate-600">Slide to browse. Double-click any screenshot to view full image.</p>
+
+      <div class="mt-5 flex items-center justify-between gap-3">
+        <button id="shotsPrev" class="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 font-semibold" aria-label="Previous screenshot">◀ Prev</button>
+        <button id="shotsNext" class="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 font-semibold" aria-label="Next screenshot">Next ▶</button>
+      </div>
+
+      <div id="shotsTrack" class="mt-4 flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory scroll-smooth pb-2">
+        <figure class="min-w-[88%] md:min-w-[72%] lg:min-w-[64%] snap-start">
+          <img class="w-full h-[300px] md:h-[420px] object-cover rounded-xl border border-slate-200 cursor-zoom-in" src="Screenshots/v2/1.ytdinitializing.png" alt="ytd initializing" data-fullscreen="true" />
+          <figcaption class="text-sm text-slate-600 mt-2">1. Initialization</figcaption>
+        </figure>
+        <figure class="min-w-[88%] md:min-w-[72%] lg:min-w-[64%] snap-start">
+          <img class="w-full h-[300px] md:h-[420px] object-cover rounded-xl border border-slate-200 cursor-zoom-in" src="Screenshots/v2/2.playlistdownload.png" alt="playlist download" data-fullscreen="true" />
+          <figcaption class="text-sm text-slate-600 mt-2">2. Playlist start</figcaption>
+        </figure>
+        <figure class="min-w-[88%] md:min-w-[72%] lg:min-w-[64%] snap-start">
+          <img class="w-full h-[300px] md:h-[420px] object-cover rounded-xl border border-slate-200 cursor-zoom-in" src="Screenshots/v2/3.playlistfetching.png" alt="playlist fetching" data-fullscreen="true" />
+          <figcaption class="text-sm text-slate-600 mt-2">3. Fetching entries</figcaption>
+        </figure>
+        <figure class="min-w-[88%] md:min-w-[72%] lg:min-w-[64%] snap-start">
+          <img class="w-full h-[300px] md:h-[420px] object-cover rounded-xl border border-slate-200 cursor-zoom-in" src="Screenshots/v2/4.playlistvideosdonloading.png" alt="playlist videos downloading" data-fullscreen="true" />
+          <figcaption class="text-sm text-slate-600 mt-2">4. Download in progress</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl p-6 md:p-8 border border-slate-100 shadow-sm">
+      <h2 class="text-3xl font-black text-ink">Use Cases: Video, Audio, Playlist</h2>
+      <div class="mt-5 grid md:grid-cols-3 gap-4">
+        <article class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+          <h3 class="font-bold">Video Download</h3>
+          <p class="mt-2 text-sm text-slate-700">Paste video URL, choose single video mode, choose video output, then quality.</p>
+        </article>
+        <article class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+          <h3 class="font-bold">Audio Download</h3>
+          <p class="mt-2 text-sm text-slate-700">Paste URL, choose MP3 output, and pick 320k/192k/128k based on quality and size.</p>
+        </article>
+        <article class="rounded-xl border border-slate-200 p-4 bg-slate-50">
+          <h3 class="font-bold">Playlist Download</h3>
+          <p class="mt-2 text-sm text-slate-700">Choose playlist mode, keep grouped folder enabled, and let the tool process each item safely.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="bg-ink text-white rounded-2xl p-8">
+      <h2 class="text-3xl font-black">Bottom Line</h2>
+      <p class="mt-3 text-slate-200 max-w-3xl">
+        ytd v2.0.0 is not just another downloader wrapper. It is an engineered reliability stack designed for difficult real-world conditions,
+        combining resilience, clarity, and operational safety in one tool.
+      </p>
+      <div class="mt-6 text-sm text-slate-300">Primary command: <span class="font-bold text-white">ytd</span> | Compatibility command: <span class="font-bold text-white">YutubuDownload</span></div>
+    </section>
+  </main>
+
+  <div id="imageModal" class="hidden fixed inset-0 z-50 bg-black/85 p-4 md:p-8">
+    <button id="closeModal" class="absolute top-4 right-4 px-3 py-2 bg-white text-slate-900 rounded-lg font-bold" aria-label="Close full image">Close ✕</button>
+    <div class="w-full h-full flex items-center justify-center">
+      <img id="modalImage" src="" alt="Full screenshot" class="max-w-full max-h-full object-contain rounded-lg" />
+    </div>
+  </div>
+
+  <script>
+    const shotsTrack = document.getElementById('shotsTrack');
+    const shotsPrev = document.getElementById('shotsPrev');
+    const shotsNext = document.getElementById('shotsNext');
+    const imageModal = document.getElementById('imageModal');
+    const closeModal = document.getElementById('closeModal');
+    const modalImage = document.getElementById('modalImage');
+
+    const scrollByCard = () => Math.round(shotsTrack.clientWidth * 0.72);
+
+    shotsPrev.addEventListener('click', () => {
+      shotsTrack.scrollBy({ left: -scrollByCard(), behavior: 'smooth' });
+    });
+
+    shotsNext.addEventListener('click', () => {
+      shotsTrack.scrollBy({ left: scrollByCard(), behavior: 'smooth' });
+    });
+
+    document.querySelectorAll('img[data-fullscreen="true"]').forEach((img) => {
+      img.addEventListener('dblclick', () => {
+        modalImage.src = img.src;
+        imageModal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+      });
+    });
+
+    const closeImageModal = () => {
+      imageModal.classList.add('hidden');
+      modalImage.src = '';
+      document.body.classList.remove('overflow-hidden');
+    };
+
+    closeModal.addEventListener('click', closeImageModal);
+    imageModal.addEventListener('click', (e) => {
+      if (e.target === imageModal) {
+        closeImageModal();
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !imageModal.classList.contains('hidden')) {
+        closeImageModal();
+      }
+    });
+  </script>
+</body>
+</html>

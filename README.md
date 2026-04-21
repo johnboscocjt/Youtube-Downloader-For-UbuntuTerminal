@@ -82,6 +82,50 @@ On better networks, you will see richer output like:
 Title ██████████░░░░ 78.4% | 3.55MiB | ETA: 00:01 | 613.74KiB/s
 ```
 
+### ⚔️ **Why v2.0.0 Is Dangerously Powerful (In a Good Way)**
+- **More aggressive reliability stack** than normal wrappers: cookies + JS runtime + retries + resume + exact quality fallback.
+- **Safer multi-instance behavior** than typical scripts: shared cookie refresh lock + per-run temp/log isolation.
+- **Cleaner operator UX** than raw yt-dlp: guided prompts, folder logic, stable progress UI, meaningful failure hints.
+- **Built for hard conditions**: unstable links, power/network interruptions, and anti-bot friction.
+
+### 📈 v2.0.0 vs Typical Downloaders
+| Capability | v2.0.0 ytd | Typical script wrapper |
+|---|---|---|
+| Concurrent terminals | ✅ Safe (lock + session isolation) | ⚠️ Often conflicts |
+| Cookie handling | ✅ Shared + controlled refresh | ⚠️ Usually ad-hoc |
+| Quality targeting | ✅ Exact + fallback | ⚠️ Often best-effort only |
+| Progress trustworthiness | ✅ Detailed + adaptive low-network mode | ⚠️ Noisy/inconsistent |
+| Playlist organization | ✅ Grouped and predictable | ⚠️ Easy to mix outputs |
+
+### 🧩 Technology Combination Diagram (v2.0.0)
+```mermaid
+flowchart LR
+  U[User] --> CLI[ytd CLI]
+  CLI --> ORCH[Bash Orchestration Layer]
+
+  ORCH --> CK[Cookie Service]
+  CK --> LOCK[Refresh Lock]
+  CK --> CFILE[cookies.txt]
+
+  ORCH --> RT[Runtime Selector]
+  RT --> DENO[Deno preferred]
+  RT --> NODE[Node fallback]
+
+  ORCH --> YTDLP[yt-dlp Engine]
+  ORCH --> FFMPEG[ffmpeg mux/convert]
+
+  ORCH --> QSEL[Exact Quality Picker]
+  QSEL --> FBK[Nearest Lower Fallback]
+
+  ORCH --> PROG[Progress Controller]
+  PROG --> P1[Single-line detailed UI]
+  PROG --> P2[Low-network fallback UI]
+
+  ORCH --> OUT[Output Organizer]
+  OUT --> SNG[Single file: current directory]
+  OUT --> PLS[Playlist: grouped folder]
+```
+
 ---
 
 ## 🌌 Alien-Tech Terminal Experience
@@ -167,6 +211,47 @@ sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-
 
 ---
 
+## 🖥️ Platform Support
+
+- **Linux (Ubuntu/Debian and similar)**: Fully supported.
+- **Windows**: Use **WSL (Windows Subsystem for Linux)** or a Linux VM. This tool is Unix shell based.
+- **macOS**: Supported (Unix-based). Install equivalent dependencies (`ffmpeg`, `python3`, `pip`, `yt-dlp`, `deno`) using Homebrew.
+
+In short: this workflow is **distro-agnostic and Unix-based**.
+
+---
+
+## 📘 How To Use (Follow-Through)
+
+### 1. Download a Single Video
+1. Run `ytd`
+2. Paste video URL
+3. Choose `1` for single video
+4. Choose `1` for video or `2` for MP3
+5. Select quality (for video)
+6. Confirm download
+
+### 2. Download Audio (MP3)
+1. Run `ytd`
+2. Paste URL (video or playlist)
+3. Choose type (single/playlist)
+4. Choose `2` for MP3
+5. Pick audio quality (320k/192k/128k)
+6. Confirm and wait for extraction
+
+### 3. Download a Full Playlist
+1. Run `ytd`
+2. Paste playlist URL
+3. Choose `2` for full playlist
+4. Keep dedicated playlist folder enabled (recommended)
+5. Confirm and monitor progress
+
+Expected behavior:
+- Strong network: full ETA + speed in one single-line progress UI.
+- Very weak network: adaptive `low-network` label appears to reduce noisy telemetry.
+
+---
+
 ## 📚 Full Documentation
 
 For detailed setup, troubleshooting, and advanced usage:  
@@ -240,6 +325,12 @@ ytd --version
 ![Completion Screen](Screenshots/i.png)
 ![Completion Screen](Screenshots/j.png)
 ![Completion Screen](Screenshots/k.png)
+
+### **8. v2 Real Download Session (Audio Playlist x3)**
+![ytd initializing](Screenshots/v2/1.ytdinitializing.png)
+![playlist download started](Screenshots/v2/2.playlistdownload.png)
+![playlist fetching](Screenshots/v2/3.playlistfetching.png)
+![playlist videos downloading](Screenshots/v2/4.playlistvideosdonloading.png)
 
 
 </div>
