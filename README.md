@@ -388,7 +388,6 @@ ytd --version
 ## 🚀 Future Roadmap
 - [x] Parallel download support
 - [ ] Download queue management  
-- [ ] Automatic quality selection based on network speed
 - [ ] GUI wrapper option
 - [ ] Mobile app companion
 
