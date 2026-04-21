@@ -216,14 +216,17 @@ echo "📦 STEP 5/5: Installing YutubuDownload script..."
 print_loading "   ⬇️  Fetching latest script"
 curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload > /dev/null 2>&1
 chmod +x /usr/local/bin/YutubuDownload > /dev/null 2>&1
+ln -sf /usr/local/bin/YutubuDownload /usr/local/bin/ytd > /dev/null 2>&1
 
-if command -v YutubuDownload &> /dev/null && YutubuDownload --version &> /dev/null; then
-    echo "   ✅ YutubuDownload installed to /usr/local/bin/YutubuDownload"
-    echo "   ✅ Version: $(YutubuDownload --version)"
+if command -v ytd &> /dev/null && ytd --version &> /dev/null; then
+    echo "   ✅ ytd installed to /usr/local/bin/ytd"
+    echo "   ✅ Compatibility command: /usr/local/bin/YutubuDownload"
+    echo "   ✅ Version: $(ytd --version)"
 else
-    echo "   ❌ FAILED to install YutubuDownload. Try manually:"
+    echo "   ❌ FAILED to install ytd. Try manually:"
     echo "      sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload"
     echo "      sudo chmod +x /usr/local/bin/YutubuDownload"
+    echo "      sudo ln -sf /usr/local/bin/YutubuDownload /usr/local/bin/ytd"
     exit 1
 fi
 
@@ -236,7 +239,7 @@ echo "║                                                                       
 echo "║   Next steps:                                                                ║"
 echo "║ 1. CLOSE ALL CHROME WINDOWS COMPLETELY (required for cookies)                ║"
 echo "║ 2. Open terminal and run:                                                    ║"
-echo "║    cd ~/youtubedownloading && YutubuDownload                                 ║"
+echo "║    cd ~/youtubedownloading && ytd                                            ║"
 echo "║ 3. Paste YouTube URL when prompted                                           ║"
 echo "║                                                                              ║"
 echo "║   💡 Tanzania Tip: Run during off-peak hours (after 10 PM EAT)               ║"
@@ -265,8 +268,8 @@ if [ -n "$CURRENT_USER" ] && [ "$CURRENT_USER" != "root" ]; then
         echo "   Deno location: $USER_HOME/.deno/bin/deno (user installation)"
         echo ""
         echo "💡 IMPORTANT: Since you have Deno as user '$CURRENT_USER',"
-        echo "   run YutubuDownload WITHOUT sudo:"
-        echo "   cd ~/youtubedownloading && YutubuDownload"
+        echo "   run ytd WITHOUT sudo:"
+        echo "   cd ~/youtubedownloading && ytd"
         echo "   cd to any directory of your choice, or use the above option"
     fi
 fi

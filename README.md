@@ -61,6 +61,27 @@
 - **Smooth Updates**: Proper carriage returns for single-line updates
 - **Multi-Instance Ready**: Supports concurrent terminal sessions with isolated state.
 
+### 🌐 **Low-Network Progress Mode (Not a Failure)**
+- **Default behavior**: On healthy networks, progress shows full detail (`ETA` + speed).
+- **Automatic fallback**: On unstable/slow links, script switches to `low-network` progress mode.
+- **Meaning**: Download is still working; UI is simplified to reduce noisy ETA/speed fluctuations.
+
+Example when unstable network is detected:
+
+```text
+sIaT8Jl2zpI █░░░░░░░░░░░░░░ 0.0% | 4.32MiB | low-network
+sIaT8Jl2zpI █████░░░░░░░░░░░ 37.6% | 4.32MiB | low-network
+sIaT8Jl2zpI ████████░░░░░░ 63.5% | 4.32MiB | low-network
+sIaT8Jl2zpI █████████████░ 96.4% | 4.32MiB | low-network
+sIaT8Jl2zpI ██████████████░ 100.0% | 4.32MiB | low-network
+```
+
+On better networks, you will see richer output like:
+
+```text
+Title ██████████░░░░ 78.4% | 3.55MiB | ETA: 00:01 | 613.74KiB/s
+```
+
 ---
 
 ## 🌌 Alien-Tech Terminal Experience
@@ -90,7 +111,7 @@ sudo bash -c "$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-
 # 1. CLOSE ALL CHROME WINDOWS COMPLETELY (required for cookie access)
 # 2. Open terminal and run:
 cd ~/youtubedownloading
-YutubuDownload
+ytd
 
 # 3. Follow prompts:
 #    • Paste YouTube URL
@@ -141,7 +162,7 @@ mkdir -p ~/youtubedownloading && cd ~/youtubedownloading
 python3 -m venv yt-venv && source yt-venv/bin/activate && pip install secretstorage cryptography && deactivate
 
 # 3. Install script
-sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload && sudo chmod +x /usr/local/bin/YutubuDownload
+sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload && sudo chmod +x /usr/local/bin/YutubuDownload && sudo ln -sf /usr/local/bin/YutubuDownload /usr/local/bin/ytd
 ```
 
 ---
@@ -165,10 +186,11 @@ sudo bash -c "$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-
 # Fetch latest version
 sudo curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-Downloader-For-UbuntuTerminal/main/YutubuDownload -o /usr/local/bin/YutubuDownload
 sudo chmod +x /usr/local/bin/YutubuDownload
+sudo ln -sf /usr/local/bin/YutubuDownload /usr/local/bin/ytd
 
 # Check version
-YutubuDownload --version
-# Should show: YutubuDownload v2.0.0 (2026-04-20) • Tanzania-Optimized • MULTI-INSTANCE + SHARED COOKIES
+ytd --version
+# Should show: ytd (YutubuDownload) v2.0.0 (2026-04-20) • Tanzania-Optimized • MULTI-INSTANCE + SHARED COOKIES
 ```
 
 ---

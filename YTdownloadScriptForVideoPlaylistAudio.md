@@ -49,6 +49,27 @@
 - **Smooth Updates**: Proper carriage returns for single-line updates
 - **Multi-Instance Ready**: Supports multiple simultaneous terminal sessions safely.
 
+### 🌐 **Low-Network Progress Mode (Not a Failure)**
+- **Default behavior**: On healthy networks, progress shows full detail (`ETA` + speed).
+- **Automatic fallback**: On unstable/slow links, script switches to `low-network` progress mode.
+- **Meaning**: Download is still running; the display is simplified because ETA/speed become noisy.
+
+Example when unstable network is detected:
+
+```text
+sIaT8Jl2zpI █░░░░░░░░░░░░░░ 0.0% | 4.32MiB | low-network
+sIaT8Jl2zpI █████░░░░░░░░░░░ 37.6% | 4.32MiB | low-network
+sIaT8Jl2zpI ████████░░░░░░ 63.5% | 4.32MiB | low-network
+sIaT8Jl2zpI █████████████░ 96.4% | 4.32MiB | low-network
+sIaT8Jl2zpI ██████████████░ 100.0% | 4.32MiB | low-network
+```
+
+On good networks, richer output appears, for example:
+
+```text
+Title ██████████░░░░ 78.4% | 3.55MiB | ETA: 00:01 | 613.74KiB/s
+```
+
 
 ---
 
@@ -132,10 +153,10 @@ sudo bash -c "$(curl -sL https://raw.githubusercontent.com/johnboscocjt/Youtube-
 
 3. **Run locally**:
    ```bash
-   ./YutubuDownload
+    ./YutubuDownload
    ```
    *Or install globally:*  
-   `sudo mv YutubuDownload /usr/local/bin/ && YutubuDownload`
+    `sudo mv YutubuDownload /usr/local/bin/ && sudo ln -sf /usr/local/bin/YutubuDownload /usr/local/bin/ytd && ytd`
 
 ---
 
@@ -568,7 +589,7 @@ get_and_display_metadata() {
 
 # Version check
 if [[ "${1:-}" == "--version" ]] || [[ "${1:-}" == "-v" ]]; then
-    echo "YutubuDownload v2.0.0 (2026-04-20) • Tanzania-Optimized • MULTI-INSTANCE + SHARED COOKIES"
+    echo "ytd (YutubuDownload) v2.0.0 (2026-04-20) • Tanzania-Optimized • MULTI-INSTANCE + SHARED COOKIES"
     exit 0
 fi
 
@@ -586,10 +607,10 @@ fi
   echo -e "\033[38;5;46m▌▌▌▌▜▘▌▌▛▌▌▌▌▌▛▌▌▌▌▛▌▐ ▛▌▀▌▛▌"
   echo -e "\033[38;5;39m▐ ▙▌▐▖▙▌▙▌▙▌▙▘▙▌▚▚▘▌▌▐▖▙▌█▌▙▌"
   echo -e "\033[0m"
-} >/dev/tty 2>/dev/null || { echo "YutubuDownload"; }
+} >/dev/tty 2>/dev/null || { echo "ytd"; }
 
 # === CUSTOM HEADER ===
-echo -e "${BRIGHT_CYAN}YutubuDownload, v2.0.0${RESET}"
+echo -e "${BRIGHT_CYAN}ytd (YutubuDownload), v2.0.0${RESET}"
 
 # === SMART COOKIE REFRESH ===
 echo -e "${SKY_BLUE}🔄 Preparing shared cookies (multi-instance safe)...${RESET}"
@@ -942,9 +963,34 @@ CURRENT_TITLE=""
 LAST_PROGRESS_TIME=0
 CURRENT_PROGRESS=""
 LOW_NETWORK_PROGRESS=false
+LOW_NETWORK_WEAK_STREAK=0
+LOW_NETWORK_STABLE_STREAK=0
 
 mark_low_network_progress() {
-    LOW_NETWORK_PROGRESS=true
+    local immediate="${1:-false}"
+    if [[ "$immediate" == "true" ]]; then
+        LOW_NETWORK_PROGRESS=true
+        LOW_NETWORK_WEAK_STREAK=3
+        LOW_NETWORK_STABLE_STREAK=0
+        return
+    fi
+
+    ((LOW_NETWORK_WEAK_STREAK+=1))
+    LOW_NETWORK_STABLE_STREAK=0
+    if ((LOW_NETWORK_WEAK_STREAK >= 3)); then
+        LOW_NETWORK_PROGRESS=true
+    fi
+}
+
+mark_network_stable() {
+    LOW_NETWORK_WEAK_STREAK=0
+    if [[ "$LOW_NETWORK_PROGRESS" == "true" ]]; then
+        ((LOW_NETWORK_STABLE_STREAK+=1))
+        if ((LOW_NETWORK_STABLE_STREAK >= 2)); then
+            LOW_NETWORK_PROGRESS=false
+            LOW_NETWORK_STABLE_STREAK=0
+        fi
+    fi
 }
 
 # Run yt-dlp with network timeout options
@@ -984,6 +1030,8 @@ yt-dlp \
         VIDEO_COMPLETE=false
         CURRENT_TITLE=""
         LOW_NETWORK_PROGRESS=false
+        LOW_NETWORK_WEAK_STREAK=0
+        LOW_NETWORK_STABLE_STREAK=0
         if [[ "$line" =~ ([0-9]+)[[:space:]]+of[[:space:]]+([0-9]+) ]]; then
             CURRENT_ITEM="${BASH_REMATCH[1]}"
             TOTAL_ITEMS="${BASH_REMATCH[2]}"
@@ -1038,7 +1086,7 @@ yt-dlp \
         fi
 
         if [[ "$line" =~ (Retrying|HTTP\ Error|connection\ reset|fragment|unable\ to\ download) ]]; then
-            mark_low_network_progress
+            mark_low_network_progress "true"
         elif [[ "$speed" =~ ^0B/s$ ]]; then
             mark_low_network_progress
         elif [[ "$speed" =~ ^([0-9]+\.?[0-9]*)([KMGT])iB/s$ ]]; then
@@ -1046,10 +1094,11 @@ yt-dlp \
             speed_unit_flag="${BASH_REMATCH[2]}"
             case "$speed_unit_flag" in
                 K)
-                    awk 'BEGIN{exit !('"$speed_value"' <= 128)}' && mark_low_network_progress
+                    awk 'BEGIN{exit !('"$speed_value"' <= 64)}' && mark_low_network_progress
+                    awk 'BEGIN{exit !('"$speed_value"' >= 256)}' && mark_network_stable
                     ;;
                 M|G|T)
-                    :
+                    mark_network_stable
                     ;;
             esac
         fi
@@ -1128,6 +1177,10 @@ yt-dlp \
     
     # Handle other yt-dlp output - show only if not in middle of progress display
     if [[ ! "$line" =~ ^\[download\]\ +[0-9] ]] && [[ "$line" =~ ^\[ ]]; then
+        if [[ "$line" =~ (Retrying|HTTP\ Error|connection\ reset|unable\ to\ download|fragment\ retries) ]]; then
+            mark_low_network_progress "true"
+        fi
+
         # Color code different message types
         if [[ "$line" =~ ^\[download\].*Downloading.*playlist ]]; then
             echo -e "${BRIGHT_MAGENTA}${line}${RESET}"
@@ -1280,19 +1333,19 @@ echo -e "\033[0m"
 ```bash
 # Always run from your download directory
 cd ~/youtubedownloading
-YutubuDownload
+ytd
 ```
 
 ### Global Usage (After Installation)
 ```bash
 # Run from ANY directory
-YutubuDownload
+ytd
 ```
 
 ### Check Version
 ```bash
-YutubuDownload --version
-# Output: YutubuDownload v2.0.0 (2026-04-20) • Tanzania-Optimized • MULTI-INSTANCE + SHARED COOKIES
+ytd --version
+# Output: ytd (YutubuDownload) v2.0.0 (2026-04-20) • Tanzania-Optimized • MULTI-INSTANCE + SHARED COOKIES
 ```
 
 ### Critical Tanzania-Specific Tips  
@@ -1304,7 +1357,7 @@ YutubuDownload --version
    - Close ALL Chrome windows  
    - Wait 30 seconds  
    - Reopen Chrome → visit YouTube → close Chrome again  
-   - Run `YutubuDownload`  
+    - Run `ytd`  
 
 ---
 
@@ -1318,6 +1371,7 @@ YutubuDownload --version
 | MP3 conversion fails | `sudo apt install ffmpeg` |
 | Permission denied on script | `sudo chmod +x /usr/local/bin/YutubuDownload` |
 | Playlist files mixing | Always choose "y" for folder creation (uses `[ID]` naming) |
+| Progress shows `low-network` | Not broken; unstable connection detected. Script auto-simplifies progress and keeps downloading. |
 | **Red error flashes** | Indicates critical failure — follow on-screen Tanzania Fix |
 
 ---
